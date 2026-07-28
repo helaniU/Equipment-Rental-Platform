@@ -1,0 +1,12 @@
+node_modules/
+dist/
+build/
+.env
+*.log
+.DS_Store
+coverage/
+.dart_tool/
+.flutter-plugin-dependencies
+android/app/build/
+ios/Pods/
+EOF
