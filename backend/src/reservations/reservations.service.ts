@@ -68,14 +68,21 @@ export class ReservationsService {
   }
 
   async findAll(user: User) {
-    if (user.role.name === 'ADMIN' || user.role.name === 'STAFF') {
-      return this.reservationRepo.find({ relations: ['customer', 'items', 'items.equipment'] });
-    }
-    return this.reservationRepo.find({
-      where: { customer: { id: user.id } },
-      relations: ['items', 'items.equipment'],
+  const roleName = typeof user.role === 'object' ? user.role?.name : user.role;
+
+  if (['ADMIN', 'STAFF', 'WAREHOUSE_OPERATOR'].includes(roleName)) {
+    return this.reservationRepo.find({ 
+      relations: ['customer', 'items', 'items.equipment'],
+      order: { createdAt: 'DESC' }
     });
   }
+
+  return this.reservationRepo.find({
+    where: { customer: { id: user.id } },
+    relations: ['items', 'items.equipment'],
+    order: { createdAt: 'DESC' }
+  });
+}
 
   async findOne(id: string, user: User) {
     const res = await this.reservationRepo.findOne({

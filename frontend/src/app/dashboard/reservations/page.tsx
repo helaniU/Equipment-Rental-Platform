@@ -1,0 +1,273 @@
+'use client';
+
+import React, { useEffect, useState } from 'react';
+import { api } from '@/lib/api';
+import { useAuth } from '@/context/AuthContext';
+import { Calendar, CheckCircle2, XCircle, Clock, Plus } from 'lucide-react';
+
+interface ReservationItem {
+  id: string;
+  quantity: number;
+  equipment: { name: string };
+}
+
+interface Reservation {
+  id: string;
+  pickupDate: string;
+  returnDate: string;
+  totalPrice: number;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'ACTIVE' | 'RETURNED' | 'CANCELLED';
+  items?: ReservationItem[];
+  customer?: { fullName: string; email: string };
+}
+
+export default function ReservationsPage() {
+  const { user } = useAuth();
+  const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // New Booking Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [equipmentList, setEquipmentList] = useState<any[]>([]);
+  const [formData, setFormData] = useState({
+    equipmentId: '',
+    quantity: 1,
+    pickupDate: '',
+    returnDate: '',
+  });
+
+  const roleName = typeof user?.role === 'object' ? user?.role?.name : user?.role;
+  const isStaffOrAdmin = ['ADMIN', 'STAFF'].includes(roleName || '');
+
+  const fetchReservations = async () => {
+    try {
+      const res = await api.get('/reservations');
+      setReservations(res.data);
+    } catch {
+      console.warn('Failed to load reservations');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchEquipment = async () => {
+    try {
+      const res = await api.get('/equipment');
+      setEquipmentList(res.data);
+    } catch {
+      console.warn('Failed to load equipment list');
+    }
+  };
+
+  useEffect(() => {
+    fetchReservations();
+    fetchEquipment();
+  }, []);
+
+  const handleStatusChange = async (id: string, status: string) => {
+    try {
+      await api.patch(`/reservations/${id}/status`, { status });
+      fetchReservations();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to update reservation status');
+    }
+  };
+
+  const handleCreateReservation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      // Formats body payload to match CreateReservationDto
+      const payload = {
+        pickupDate: formData.pickupDate,
+        returnDate: formData.returnDate,
+        items: [
+          {
+            equipmentId: formData.equipmentId,
+            quantity: Number(formData.quantity),
+          },
+        ],
+      };
+
+      await api.post('/reservations', payload);
+      setIsModalOpen(false);
+      setFormData({ equipmentId: '', quantity: 1, pickupDate: '', returnDate: '' });
+      fetchReservations();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to create reservation');
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'APPROVED':
+      case 'ACTIVE':
+        return <span className="px-2.5 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1 w-fit"><CheckCircle2 className="w-3.5 h-3.5" /> {status}</span>;
+      case 'PENDING':
+        return <span className="px-2.5 py-1 bg-amber-100 text-amber-700 text-xs font-semibold rounded-full flex items-center gap-1 w-fit"><Clock className="w-3.5 h-3.5" /> {status}</span>;
+      case 'REJECTED':
+      case 'CANCELLED':
+        return <span className="px-2.5 py-1 bg-red-100 text-red-700 text-xs font-semibold rounded-full flex items-center gap-1 w-fit"><XCircle className="w-3.5 h-3.5" /> {status}</span>;
+      default:
+        return <span className="px-2.5 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full w-fit">{status}</span>;
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-lg font-bold text-gray-800">Booking Management</h2>
+          <p className="text-xs text-gray-500">Track and update equipment rental reservations</p>
+        </div>
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg text-sm transition"
+        >
+          <Plus className="w-4 h-4" />
+          New Reservation
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="text-center py-12 text-gray-500">Loading bookings...</div>
+      ) : reservations.length === 0 ? (
+        <div className="bg-white p-12 rounded-xl border border-gray-200 text-center text-gray-500">
+          <Calendar className="w-12 h-12 mx-auto text-gray-300 mb-2" />
+          No reservations found.
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+          <table className="w-full text-left text-sm text-gray-700">
+            <thead className="bg-gray-50 border-b border-gray-200 text-gray-600 font-semibold text-xs uppercase">
+              <tr>
+                <th className="p-4">Equipment</th>
+                <th className="p-4">Reserved By</th>
+                <th className="p-4">Rental Period</th>
+                <th className="p-4">Total</th>
+                <th className="p-4">Status</th>
+                {isStaffOrAdmin && <th className="p-4 text-right">Actions</th>}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {reservations.map((res) => {
+                const equipmentSummary = res.items?.map((i) => `${i.equipment?.name || 'Equipment'} (x${i.quantity})`).join(', ') || 'N/A';
+
+                return (
+                  <tr key={res.id} className="hover:bg-gray-50 transition">
+                    <td className="p-4 font-semibold text-gray-900">{equipmentSummary}</td>
+                    <td className="p-4">
+                      <div>{res.customer?.fullName || 'N/A'}</div>
+                      <div className="text-xs text-gray-400">{res.customer?.email}</div>
+                    </td>
+                    <td className="p-4 text-xs">
+                      {new Date(res.pickupDate).toLocaleDateString()} — {new Date(res.returnDate).toLocaleDateString()}
+                    </td>
+                    <td className="p-4 font-bold text-blue-600">${res.totalPrice}</td>
+                    <td className="p-4">{getStatusBadge(res.status)}</td>
+                    {isStaffOrAdmin && (
+                      <td className="p-4 text-right space-x-2">
+                        {res.status === 'PENDING' && (
+                          <>
+                            <button
+                              onClick={() => handleStatusChange(res.id, 'APPROVED')}
+                              className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => handleStatusChange(res.id, 'REJECTED')}
+                              className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
+                            >
+                              Reject
+                            </button>
+                          </>
+                        )}
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* New Reservation Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl max-w-md w-full p-6 space-y-4">
+            <h3 className="text-lg font-bold text-gray-900">Create New Reservation</h3>
+            <form onSubmit={handleCreateReservation} className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Select Equipment</label>
+                <select
+                  required
+                  value={formData.equipmentId}
+                  onChange={(e) => setFormData({ ...formData, equipmentId: e.target.value })}
+                  className="w-full border rounded-lg p-2 text-sm text-gray-900"
+                >
+                  <option value="">-- Choose Equipment --</option>
+                  {equipmentList.map((eq) => (
+                    <option key={eq.id} value={eq.id}>
+                      {eq.name} (${eq.rentalPrice}/day)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Quantity</label>
+                <input
+                  type="number"
+                  min="1"
+                  required
+                  value={formData.quantity}
+                  onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value, 10) || 1 })}
+                  className="w-full border rounded-lg p-2 text-sm text-gray-900"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Pickup Date</label>
+                <input
+                  type="date"
+                  required
+                  value={formData.pickupDate}
+                  onChange={(e) => setFormData({ ...formData, pickupDate: e.target.value })}
+                  className="w-full border rounded-lg p-2 text-sm text-gray-900"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Return Date</label>
+                <input
+                  type="date"
+                  required
+                  value={formData.returnDate}
+                  onChange={(e) => setFormData({ ...formData, returnDate: e.target.value })}
+                  className="w-full border rounded-lg p-2 text-sm text-gray-900"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
+                >
+                  Submit Booking
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

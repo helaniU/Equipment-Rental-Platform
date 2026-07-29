@@ -13,6 +13,23 @@ export class InventoryService {
     @InjectRepository(ActivityLog) private logRepo: Repository<ActivityLog>,
   ) {}
 
+  async findAll() {
+    const items = await this.equipmentRepo.find({
+      relations: ['category'],
+    });
+
+    return items.map((item) => ({
+      id: item.id,
+      name: item.name,
+      sku: item['sku'] || `EQ-${item.id.slice(0, 6).toUpperCase()}`,
+      stockQuantity: item.stockQuantity,
+      availableQuantity: item.isAvailable ? item.stockQuantity : 0,
+      maintenanceQuantity: item['maintenanceQuantity'] || 0,
+      location: item['location'] || 'Warehouse A',
+      category: item.category?.name || 'General',
+    }));
+  }
+
   async recordAction(operator: User, dto: RecordInventoryActionDto) {
     const equipment = await this.equipmentRepo.findOne({ where: { id: dto.equipmentId } });
     if (!equipment) throw new NotFoundException('Equipment not found');

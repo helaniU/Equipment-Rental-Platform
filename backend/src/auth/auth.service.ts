@@ -46,7 +46,7 @@ export class AuthService {
   async login(dto: LoginDto) {
     const user = await this.userRepo.findOne({
       where: { email: dto.email },
-      relations: ['role'],
+      relations: ['role'], // Populates user.role relation
     });
 
     if (!user) {
@@ -80,7 +80,6 @@ export class AuthService {
   async forgotPassword(dto: ForgotPasswordDto) {
     const user = await this.userRepo.findOne({ where: { email: dto.email } });
     if (!user) {
-      // Return success to avoid leaking user existence
       return { message: 'If an account exists, a password reset token has been sent.' };
     }
 
@@ -89,7 +88,6 @@ export class AuthService {
       { secret: process.env.JWT_SECRET || 'secret', expiresIn: '15m' },
     );
 
-    // In production, send resetToken via email queue
     return { message: 'Password reset token generated', resetToken };
   }
 
@@ -115,7 +113,8 @@ export class AuthService {
   }
 
   private generateTokens(user: User) {
-    const payload = { sub: user.id, email: user.email, role: user.role.name };
+    const roleName = user.role?.name || RoleType.CUSTOMER;
+    const payload = { sub: user.id, email: user.email, role: roleName };
     const accessToken = this.jwtService.sign(payload, {
       secret: this.configService.get<string>('JWT_SECRET'),
       expiresIn: this.configService.get<string>('JWT_EXPIRATION') || '1d',
@@ -132,7 +131,7 @@ export class AuthService {
         id: user.id,
         email: user.email,
         fullName: user.fullName,
-        role: user.role.name,
+        role: { name: roleName }, // Sends role as { name: "ADMIN" } to match AuthContext!
       },
     };
   }

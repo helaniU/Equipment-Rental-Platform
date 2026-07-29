@@ -14,6 +14,13 @@ import { RoleType } from '../database/entities/role.entity';
 export class InventoryController {
   constructor(private readonly inventoryService: InventoryService) {}
 
+  @Get()
+  @Roles(RoleType.ADMIN, RoleType.STAFF, RoleType.WAREHOUSE_OPERATOR)
+  @ApiOperation({ summary: 'Get overview of all inventory items and stock levels' })
+  findAll() {
+    return this.inventoryService.findAll();
+  }
+
   @Post('action')
   @Roles(RoleType.ADMIN, RoleType.STAFF, RoleType.WAREHOUSE_OPERATOR)
   @ApiOperation({ summary: 'Receive, release, record damage or maintenance for equipment' })
