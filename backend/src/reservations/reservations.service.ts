@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Reservation, ReservationStatus } from '../database/entities/reservation.entity';
@@ -6,6 +6,7 @@ import { ReservationItem } from '../database/entities/reservation-item.entity';
 import { Equipment } from '../database/entities/equipment.entity';
 import { User } from '../database/entities/user.entity';
 import { CreateReservationDto } from './dto/create-reservation.dto';
+import { UpdateReservationStatusDto } from './dto/update-reservation-status.dto';
 
 @Injectable()
 export class ReservationsService {
@@ -54,7 +55,7 @@ export class ReservationsService {
     }
 
     const reservation = this.reservationRepo.create({
-      customer: user,
+      user, // Use 'user' instead of 'customer'
       pickupDate: pickup,
       returnDate: returnDt,
       totalPrice,
@@ -68,40 +69,98 @@ export class ReservationsService {
   }
 
   async findAll(user: User) {
-  const roleName = typeof user.role === 'object' ? user.role?.name : user.role;
+    const roleName = typeof user.role === 'object' ? (user.role as any)?.name : user.role;
 
-  if (['ADMIN', 'STAFF', 'WAREHOUSE_OPERATOR'].includes(roleName)) {
-    return this.reservationRepo.find({ 
-      relations: ['customer', 'items', 'items.equipment'],
+    if (['ADMIN', 'STAFF', 'WAREHOUSE_OPERATOR'].includes(roleName)) {
+      return this.reservationRepo.find({ 
+        relations: ['user', 'items', 'items.equipment'],
+        order: { createdAt: 'DESC' }
+      });
+    }
+
+    return this.reservationRepo.find({
+      where: { user: { id: user.id } }, // Use 'user' instead of 'customer'
+      relations: ['items', 'items.equipment'],
       order: { createdAt: 'DESC' }
     });
   }
 
-  return this.reservationRepo.find({
-    where: { customer: { id: user.id } },
-    relations: ['items', 'items.equipment'],
-    order: { createdAt: 'DESC' }
-  });
-}
-
   async findOne(id: string, user: User) {
     const res = await this.reservationRepo.findOne({
       where: { id },
-      relations: ['customer', 'items', 'items.equipment'],
+      relations: ['user', 'items', 'items.equipment'],
     });
 
     if (!res) throw new NotFoundException('Reservation not found');
-    if (user.role.name === 'CUSTOMER' && res.customer.id !== user.id) {
-      throw new BadRequestException('Access denied');
+
+    const roleName = typeof user.role === 'object' ? (user.role as any)?.name : user.role;
+    if (roleName === 'CUSTOMER' && res.user?.id !== user.id) {
+      throw new ForbiddenException('Access denied');
     }
 
     return res;
   }
 
-  async updateStatus(id: string, status: ReservationStatus) {
-    const res = await this.reservationRepo.findOne({ where: { id } });
+  async updateStatus(id: string, dto: UpdateReservationStatusDto) {
+    const res = await this.reservationRepo.findOne({
+      where: { id },
+      relations: ['items', 'items.equipment'],
+    });
+
     if (!res) throw new NotFoundException('Reservation not found');
-    res.status = status;
+
+    if (dto.status === ReservationStatus.REJECTED && !dto.rejectionReason) {
+      throw new BadRequestException('Rejection reason is required when rejecting a reservation');
+    }
+
+    const oldStatus = res.status;
+    const newStatus = dto.status;
+
+    if (newStatus === ReservationStatus.ACTIVE && oldStatus !== ReservationStatus.ACTIVE) {
+      for (const item of res.items) {
+        const equipment = item.equipment;
+        if (equipment.stockQuantity < item.quantity) {
+          throw new BadRequestException(`Cannot activate: Insufficient stock for ${equipment.name}`);
+        }
+        equipment.stockQuantity -= item.quantity;
+        if (equipment.stockQuantity <= 0) equipment.isAvailable = false;
+        await this.equipmentRepo.save(equipment);
+      }
+    } else if (newStatus === ReservationStatus.RETURNED && oldStatus === ReservationStatus.ACTIVE) {
+      for (const item of res.items) {
+        const equipment = item.equipment;
+        equipment.stockQuantity += item.quantity;
+        if (equipment.stockQuantity > 0) equipment.isAvailable = true;
+        await this.equipmentRepo.save(equipment);
+      }
+    }
+
+    res.status = newStatus;
+    if (dto.rejectionReason) {
+      res.rejectionReason = dto.rejectionReason;
+    }
+
+    return this.reservationRepo.save(res);
+  }
+
+  async cancel(id: string, user: User) {
+    const res = await this.reservationRepo.findOne({
+      where: { id },
+      relations: ['user'],
+    });
+
+    if (!res) throw new NotFoundException('Reservation not found');
+
+    const roleName = typeof user.role === 'object' ? (user.role as any)?.name : user.role;
+    if (roleName === 'CUSTOMER' && res.user?.id !== user.id) {
+      throw new ForbiddenException('You can only cancel your own reservations');
+    }
+
+    if (res.status !== ReservationStatus.PENDING) {
+      throw new BadRequestException('Only PENDING reservations can be cancelled');
+    }
+
+    res.status = ReservationStatus.CANCELLED;
     return this.reservationRepo.save(res);
   }
 }

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards } from '@nestjs/common';
+//import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { EquipmentService } from './equipment.service';
 import { CreateEquipmentDto } from './dto/create-equipment.dto';
@@ -8,66 +8,91 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RoleType } from '../database/entities/role.entity';
+import { Controller, Get, Post, Put, Body, Patch, Param, Delete, Query, UseGuards } from '@nestjs/common';
 
 @ApiTags('Equipment & Categories')
-@Controller('equipment')
+@Controller()
 export class EquipmentController {
   constructor(private readonly equipmentService: EquipmentService) {}
 
-  // Categories
+  // --- PUBLIC / ALL USERS ENDPOINTS ---
+
   @Get('categories')
   @ApiOperation({ summary: 'List all equipment categories' })
   getCategories() {
     return this.equipmentService.findAllCategories();
   }
 
+  @Get('equipment')
+  @ApiOperation({ summary: 'List all equipment items with search & category filter' })
+  @ApiQuery({ name: 'categoryId', required: false })
+  @ApiQuery({ name: 'search', required: false })
+  getEquipment(
+    @Query('categoryId') categoryId?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.equipmentService.findAllEquipment(categoryId, search);
+  }
+
+  @Get('equipment/:id')
+  @ApiOperation({ summary: 'Get single equipment details' })
+  getEquipmentById(@Param('id') id: string) {
+    return this.equipmentService.findOneEquipment(id);
+  }
+
+  // --- ADMIN & STAFF ONLY ENDPOINTS ---
+
   @Post('categories')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(RoleType.ADMIN, RoleType.STAFF)
-  @ApiOperation({ summary: 'Create a new equipment category (Admin/Staff only)' })
+  @ApiOperation({ summary: 'Create new equipment category (Admin/Staff only)' })
   createCategory(@Body() dto: CreateCategoryDto) {
     return this.equipmentService.createCategory(dto);
   }
 
-  // Equipment CRUD
-  @Get()
-  @ApiOperation({ summary: 'List all equipment (Supports category filtering)' })
-  @ApiQuery({ name: 'categoryId', required: false })
-  findAll(@Query('categoryId') categoryId?: string) {
-    return this.equipmentService.findAll(categoryId);
-  }
-
-  @Get(':id')
-  @ApiOperation({ summary: 'Get equipment details by ID' })
-  findOne(@Param('id') id: string) {
-    return this.equipmentService.findOne(id);
-  }
-
-  @Post()
+  @Put('categories/:id')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(RoleType.ADMIN, RoleType.STAFF)
-  @ApiOperation({ summary: 'Add new equipment item (Admin/Staff only)' })
-  create(@Body() dto: CreateEquipmentDto) {
-    return this.equipmentService.create(dto);
+  @ApiOperation({ summary: 'Update equipment category (Admin/Staff only)' })
+  updateCategory(@Param('id') id: string, @Body() dto: CreateCategoryDto) {
+    return this.equipmentService.updateCategory(id, dto);
   }
 
-  @Patch(':id')
+  @Delete('categories/:id')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(RoleType.ADMIN, RoleType.STAFF)
-  @ApiOperation({ summary: 'Update equipment details (Admin/Staff only)' })
-  update(@Param('id') id: string, @Body() dto: UpdateEquipmentDto) {
-    return this.equipmentService.update(id, dto);
+  @ApiOperation({ summary: 'Delete category (Admin/Staff only)' })
+  deleteCategory(@Param('id') id: string) {
+    return this.equipmentService.deleteCategory(id);
   }
 
-  @Delete(':id')
+  @Post('equipment')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(RoleType.ADMIN)
-  @ApiOperation({ summary: 'Delete equipment item (Admin only)' })
-  remove(@Param('id') id: string) {
-    return this.equipmentService.remove(id);
+  @Roles(RoleType.ADMIN, RoleType.STAFF)
+  @ApiOperation({ summary: 'Create new equipment item (Admin/Staff only)' })
+  createEquipment(@Body() dto: CreateEquipmentDto) {
+    return this.equipmentService.createEquipment(dto);
+  }
+
+  @Put('equipment/:id')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(RoleType.ADMIN, RoleType.STAFF)
+  @ApiOperation({ summary: 'Update equipment item (Admin/Staff only)' })
+  updateEquipment(@Param('id') id: string, @Body() dto: UpdateEquipmentDto) {
+    return this.equipmentService.updateEquipment(id, dto);
+  }
+
+  @Delete('equipment/:id')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(RoleType.ADMIN, RoleType.STAFF)
+  @ApiOperation({ summary: 'Delete equipment item (Admin/Staff only)' })
+  deleteEquipment(@Param('id') id: string) {
+    return this.equipmentService.deleteEquipment(id);
   }
 }

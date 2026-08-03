@@ -12,7 +12,7 @@ interface InventoryItem {
   availableQuantity: number;
   maintenanceQuantity: number;
   location: string;
-  category?: string;
+  category?: { id: string; name: string } | string;
 }
 
 export default function InventoryPage() {
@@ -25,14 +25,38 @@ export default function InventoryPage() {
   const [notes, setNotes] = useState('');
 
   const fetchInventory = async () => {
+    setLoading(true);
     try {
+      // Primary Attempt: Try dedicated inventory endpoint
       const res = await api.get('/inventory');
-      setItems(res.data);
+      setItems(normalizeInventoryData(res.data));
     } catch {
-      console.warn('Could not retrieve inventory from backend');
+      try {
+        // Fallback Attempt: If /inventory endpoint isn't mounted, load equipment stock
+        const resEquipment = await api.get('/equipment');
+        setItems(normalizeInventoryData(resEquipment.data));
+      } catch (err) {
+        console.warn('Could not retrieve inventory or equipment data from backend', err);
+        setItems([]);
+      }
     } finally {
       setLoading(false);
     }
+  };
+
+  // Helper to ensure all required UI properties exist safely
+  const normalizeInventoryData = (data: any[]): InventoryItem[] => {
+    if (!Array.isArray(data)) return [];
+    return data.map((item) => ({
+      id: item.id,
+      name: item.name || 'Unnamed Equipment',
+      sku: item.sku || item.id?.substring(0, 8).toUpperCase() || 'N/A',
+      stockQuantity: item.stockQuantity ?? item.quantity ?? 0,
+      availableQuantity: item.availableQuantity ?? item.stockQuantity ?? 0,
+      maintenanceQuantity: item.maintenanceQuantity ?? 0,
+      location: item.location || 'Main Warehouse',
+      category: item.category?.name || item.category || 'Uncategorized',
+    }));
   };
 
   useEffect(() => {
@@ -61,8 +85,8 @@ export default function InventoryPage() {
   };
 
   const filteredItems = items.filter((item) =>
-    item.name.toLowerCase().includes(search.toLowerCase()) ||
-    item.sku.toLowerCase().includes(search.toLowerCase())
+    (item.name || '').toLowerCase().includes(search.toLowerCase()) ||
+    (item.sku || '').toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -100,6 +124,7 @@ export default function InventoryPage() {
             <thead className="bg-gray-50 border-b border-gray-200 text-gray-600 font-semibold text-xs uppercase">
               <tr>
                 <th className="p-4">Equipment Item</th>
+                <th className="p-4">Category</th>
                 <th className="p-4">SKU / Code</th>
                 <th className="p-4">Warehouse Location</th>
                 <th className="p-4 text-center">Total Stock</th>
@@ -112,6 +137,9 @@ export default function InventoryPage() {
               {filteredItems.map((item) => (
                 <tr key={item.id} className="hover:bg-gray-50 transition">
                   <td className="p-4 font-semibold text-gray-900">{item.name}</td>
+                  <td className="p-4 text-xs text-gray-600">
+                    {typeof item.category === 'string' ? item.category : 'Uncategorized'}
+                  </td>
                   <td className="p-4 text-xs font-mono text-gray-500">{item.sku}</td>
                   <td className="p-4 text-xs text-gray-600">{item.location}</td>
                   <td className="p-4 text-center font-bold text-gray-900">{item.stockQuantity}</td>

@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
-import { Calendar, CheckCircle2, XCircle, Clock, Plus } from 'lucide-react';
+import { Calendar, CheckCircle2, XCircle, Clock, Plus, CreditCard, AlertCircle } from 'lucide-react';
 
 interface ReservationItem {
   id: string;
@@ -18,7 +18,8 @@ interface Reservation {
   totalPrice: number;
   status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'ACTIVE' | 'RETURNED' | 'CANCELLED';
   items?: ReservationItem[];
-  customer?: { fullName: string; email: string };
+  customer?: { fullName?: string; name?: string; email?: string };
+  user?: { fullName?: string; name?: string; email?: string };
 }
 
 export default function ReservationsPage() {
@@ -35,6 +36,10 @@ export default function ReservationsPage() {
     pickupDate: '',
     returnDate: '',
   });
+
+  // Custom Payment Message Box Modal State
+  const [selectedPaymentReservation, setSelectedPaymentReservation] = useState<Reservation | null>(null);
+  const [isPaying, setIsPaying] = useState(false);
 
   const roleName = typeof user?.role === 'object' ? user?.role?.name : user?.role;
   const isStaffOrAdmin = ['ADMIN', 'STAFF'].includes(roleName || '');
@@ -73,10 +78,36 @@ export default function ReservationsPage() {
     }
   };
 
+  // Open Custom Payment Dialog Box
+  const handleOpenPaymentModal = (res: Reservation) => {
+    setSelectedPaymentReservation(res);
+  };
+
+  // Process Mock Payment via `/payments/process`
+  const confirmPayment = async () => {
+    if (!selectedPaymentReservation) return;
+
+    setIsPaying(true);
+    try {
+      await api.post('/payments/process', {
+        reservationId: selectedPaymentReservation.id,
+        amount: Number(selectedPaymentReservation.totalPrice),
+        type: 'RENTAL_FEE', // Updated enum value
+        paymentMethod: 'MOCK_CARD',
+      });
+
+      setSelectedPaymentReservation(null);
+      fetchReservations();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Payment processing failed');
+    } finally {
+      setIsPaying(false);
+    }
+  };
+
   const handleCreateReservation = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      // Formats body payload to match CreateReservationDto
       const payload = {
         pickupDate: formData.pickupDate,
         returnDate: formData.returnDate,
@@ -145,50 +176,126 @@ export default function ReservationsPage() {
                 <th className="p-4">Rental Period</th>
                 <th className="p-4">Total</th>
                 <th className="p-4">Status</th>
-                {isStaffOrAdmin && <th className="p-4 text-right">Actions</th>}
+                <th className="p-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {reservations.map((res) => {
                 const equipmentSummary = res.items?.map((i) => `${i.equipment?.name || 'Equipment'} (x${i.quantity})`).join(', ') || 'N/A';
+                
+                const clientObj = res.customer || res.user;
+                const clientName = clientObj?.fullName || clientObj?.name || 'Customer';
+                const clientEmail = clientObj?.email || '';
 
                 return (
                   <tr key={res.id} className="hover:bg-gray-50 transition">
                     <td className="p-4 font-semibold text-gray-900">{equipmentSummary}</td>
                     <td className="p-4">
-                      <div>{res.customer?.fullName || 'N/A'}</div>
-                      <div className="text-xs text-gray-400">{res.customer?.email}</div>
+                      <div className="font-medium text-gray-900">{clientName}</div>
+                      {clientEmail && <div className="text-xs text-gray-400">{clientEmail}</div>}
                     </td>
                     <td className="p-4 text-xs">
                       {new Date(res.pickupDate).toLocaleDateString()} — {new Date(res.returnDate).toLocaleDateString()}
                     </td>
                     <td className="p-4 font-bold text-blue-600">${res.totalPrice}</td>
                     <td className="p-4">{getStatusBadge(res.status)}</td>
-                    {isStaffOrAdmin && (
-                      <td className="p-4 text-right space-x-2">
-                        {res.status === 'PENDING' && (
-                          <>
-                            <button
-                              onClick={() => handleStatusChange(res.id, 'APPROVED')}
-                              className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
-                            >
-                              Approve
-                            </button>
-                            <button
-                              onClick={() => handleStatusChange(res.id, 'REJECTED')}
-                              className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
-                            >
-                              Reject
-                            </button>
-                          </>
-                        )}
-                      </td>
-                    )}
+                    
+                    <td className="p-4 text-right space-x-2">
+                      {/* ADMIN / STAFF Actions */}
+                      {isStaffOrAdmin && res.status === 'PENDING' && (
+                        <>
+                          <button
+                            onClick={() => handleStatusChange(res.id, 'APPROVED')}
+                            className="px-3 py-1 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700 transition"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => handleStatusChange(res.id, 'REJECTED')}
+                            className="px-3 py-1 bg-red-600 text-white text-xs font-medium rounded hover:bg-red-700 transition"
+                          >
+                            Reject
+                          </button>
+                        </>
+                      )}
+
+                      {/* CUSTOMER Action: Only show "Pay Now" when reservation status is APPROVED */}
+                      {!isStaffOrAdmin && res.status === 'APPROVED' && (
+                        <button
+                          onClick={() => handleOpenPaymentModal(res)}
+                          className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition inline-flex items-center gap-1.5 shadow-sm"
+                        >
+                          <CreditCard className="w-3.5 h-3.5" />
+                          Pay Now
+                        </button>
+                      )}
+
+                      {!isStaffOrAdmin && res.status === 'PENDING' && (
+                        <span className="text-xs text-gray-400 italic">Awaiting Approval</span>
+                      )}
+
+                      {!isStaffOrAdmin && res.status === 'ACTIVE' && (
+                        <span className="text-xs text-green-600 font-medium">Paid & Active</span>
+                      )}
+                    </td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* CUSTOM PAYMENT MESSAGE BOX MODAL */}
+      {selectedPaymentReservation && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl max-w-sm w-full p-6 space-y-4 shadow-xl">
+            <div className="text-center">
+              <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                <CreditCard className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900">Payment Confirmation</h3>
+              <p className="text-xs text-gray-500 mt-1">
+                Confirm payment for your equipment reservation
+              </p>
+            </div>
+
+            <div className="space-y-2 bg-gray-50 p-3 rounded-lg border border-gray-200 text-xs text-gray-700">
+              <div className="flex justify-between border-b pb-1">
+                <span className="text-gray-500">Equipment:</span>
+                <span className="font-semibold text-gray-900">
+                  {selectedPaymentReservation.items?.map((i) => i.equipment?.name).join(', ') || 'Gear'}
+                </span>
+              </div>
+              <div className="flex justify-between border-b pb-1">
+                <span className="text-gray-500">Customer:</span>
+                <span className="font-medium text-gray-900">{user?.fullName || user?.email}</span>
+              </div>
+              <div className="flex justify-between pt-1 text-sm font-bold">
+                <span className="text-gray-700">Total Amount:</span>
+                <span className="text-blue-600">${selectedPaymentReservation.totalPrice}</span>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setSelectedPaymentReservation(null)}
+                disabled={isPaying}
+                className="px-4 py-2 border rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50 transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmPayment}
+                disabled={isPaying}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 transition flex items-center gap-1"
+              >
+                {isPaying ? 'Processing...' : 'Confirm & Pay'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

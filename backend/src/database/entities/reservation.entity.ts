@@ -1,3 +1,5 @@
+// backend/src/database/entities/reservation.entity.ts
+
 import {
   Entity,
   PrimaryGeneratedColumn,
@@ -10,8 +12,8 @@ import {
 } from 'typeorm';
 import { User } from './user.entity';
 import { ReservationItem } from './reservation-item.entity';
-import { Payment } from './payment.entity';
 
+// EXPORT THIS ENUM
 export enum ReservationStatus {
   PENDING = 'PENDING',
   APPROVED = 'APPROVED',
@@ -26,9 +28,29 @@ export class Reservation {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @ManyToOne(() => User, (user) => user.reservations)
-  @JoinColumn({ name: 'customer_id' })
-  customer: User;
+  // Use 'user' as the relation property name
+  @ManyToOne(() => User, { onDelete: 'CASCADE', eager: true })
+  @JoinColumn({ name: 'userId' })
+  user: User;
+
+  @Column({ nullable: true })
+  userId: string;
+
+  // Add OneToMany relation for items
+  @OneToMany(() => ReservationItem, (item) => item.reservation, { cascade: true })
+  items: ReservationItem[];
+
+  @Column({ type: 'date' })
+  pickupDate: Date;
+
+  @Column({ type: 'date' })
+  returnDate: Date;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2 })
+  totalPrice: number;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2 })
+  depositAmount: number;
 
   @Column({
     type: 'enum',
@@ -37,26 +59,11 @@ export class Reservation {
   })
   status: ReservationStatus;
 
-  @Column('date')
-  pickupDate: Date;
-
-  @Column('date')
-  returnDate: Date;
-
-  @Column('decimal', { precision: 10, scale: 2 })
-  totalPrice: number;
-
-  @Column('decimal', { precision: 10, scale: 2 })
-  depositAmount: number;
+  @Column({ nullable: true })
+  rejectionReason: string;
 
   @Column({ nullable: true })
   qrCode: string;
-
-  @OneToMany(() => ReservationItem, (item) => item.reservation, { cascade: true })
-  items: ReservationItem[];
-
-  @OneToMany(() => Payment, (payment) => payment.reservation)
-  payments: Payment[];
 
   @CreateDateColumn()
   createdAt: Date;

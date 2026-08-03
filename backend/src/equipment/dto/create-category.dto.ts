@@ -1,13 +1,25 @@
-import { ApiProperty } from '@nestjs/swagger';
 import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateCategoryDto {
-  @ApiProperty({ example: 'Lighting & Grip' })
+  @ApiProperty({ example: 'Camera Gear' })
   @IsString()
   @IsNotEmpty()
-  name!: string;
+  name: string;
 
-  @ApiProperty({ example: 'Studio lights, softboxes, and stands', required: false })
+  @ApiPropertyOptional({ example: 'Professional cameras and lenses' })
+  @IsString()
+  @IsOptional()
+  description?: string;
+}
+
+export class UpdateCategoryDto {
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  name?: string;
+
+  @ApiPropertyOptional()
   @IsString()
   @IsOptional()
   description?: string;

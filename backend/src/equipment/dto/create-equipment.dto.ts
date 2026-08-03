@@ -1,37 +1,93 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsBoolean, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
+import { IsArray, IsBoolean, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateEquipmentDto {
-  @ApiProperty({ example: 'Sony A7 IV Digital Camera' })
+  @ApiProperty({ example: 'Sony FX3 Cinema Camera' })
   @IsString()
   @IsNotEmpty()
-  name!: string;
+  name: string;
 
-  @ApiProperty({ example: 'Full-frame mirrorless camera suitable for video and photo production.' })
+  @ApiPropertyOptional({ example: 'Full-frame Cinema Line camera with 4K resolution' })
   @IsString()
-  @IsNotEmpty()
-  description!: string;
+  @IsOptional()
+  description?: string;
+
+  @ApiPropertyOptional({ example: ['https://s3-url.com/fx3.jpg'] })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  images?: string[];
 
   @ApiProperty({ example: 45.00 })
   @IsNumber()
   @Min(0)
-  rentalPrice!: number;
+  rentalPrice: number;
 
   @ApiProperty({ example: 200.00 })
   @IsNumber()
   @Min(0)
-  deposit!: number;
+  deposit: number;
 
-  @ApiProperty({ example: 5 })
+  @ApiProperty({ example: 3 })
   @IsNumber()
   @Min(0)
-  stockQuantity!: number;
+  stockQuantity: number;
 
-  @ApiProperty({ example: 'category-uuid-here' })
-  @IsUUID()
-  categoryId!: string;
-
-  @ApiProperty({ example: { sensor: '33MP Full-Frame', video: '4K 60p' }, required: false })
+  @ApiPropertyOptional({ example: { resolution: '4K', mount: 'E-mount' } })
   @IsOptional()
   specifications?: Record<string, any>;
+
+  @ApiProperty({ example: 'uuid-of-category' })
+  @IsUUID()
+  @IsNotEmpty()
+  categoryId: string;
+}
+
+export class UpdateEquipmentDto {
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  name?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  description?: string;
+
+  @ApiPropertyOptional()
+  @IsArray()
+  @IsOptional()
+  images?: string[];
+
+  @ApiPropertyOptional()
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  rentalPrice?: number;
+
+  @ApiPropertyOptional()
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  deposit?: number;
+
+  @ApiPropertyOptional()
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  stockQuantity?: number;
+
+  @ApiPropertyOptional()
+  @IsBoolean()
+  @IsOptional()
+  isAvailable?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  specifications?: Record<string, any>;
+
+  @ApiPropertyOptional()
+  @IsUUID()
+  @IsOptional()
+  categoryId?: string;
 }

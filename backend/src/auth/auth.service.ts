@@ -112,27 +112,19 @@ export class AuthService {
     }
   }
 
-  private generateTokens(user: User) {
-    const roleName = user.role?.name || RoleType.CUSTOMER;
-    const payload = { sub: user.id, email: user.email, role: roleName };
-    const accessToken = this.jwtService.sign(payload, {
-      secret: this.configService.get<string>('JWT_SECRET'),
-      expiresIn: this.configService.get<string>('JWT_EXPIRATION') || '1d',
-    });
-    const refreshToken = this.jwtService.sign(payload, {
-      secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
-      expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRATION') || '7d',
+  async generateTokens(user: User) {
+    const payload = { sub: user.id, email: user.email, role: user.role };
+
+    const accessToken = await this.jwtService.signAsync(payload, {
+      secret: this.configService.get<string>('JWT_SECRET') || 'super_secret_jwt_key_12345',
+      expiresIn: '1d',
     });
 
-    return {
-      accessToken,
-      refreshToken,
-      user: {
-        id: user.id,
-        email: user.email,
-        fullName: user.fullName,
-        role: { name: roleName }, // Sends role as { name: "ADMIN" } to match AuthContext!
-      },
-    };
+    const refreshToken = await this.jwtService.signAsync(payload, {
+      secret: this.configService.get<string>('REFRESH_TOKEN_SECRET') || 'super_secret_refresh_key_12345',
+      expiresIn: '7d',
+    });
+
+    return { accessToken, refreshToken };
   }
 }

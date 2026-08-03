@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
-import { Search, Filter, Plus, Package, Tag } from 'lucide-react';
+import { Search, Filter, Plus, Package, Tag, Pencil, Trash2, AlertTriangle } from 'lucide-react';
 
 interface Category {
   id: string;
@@ -33,6 +33,11 @@ export default function EquipmentPage() {
   // Modals State
   const [isEquipmentModalOpen, setIsEquipmentModalOpen] = useState(false);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [editingEquipment, setEditingEquipment] = useState<EquipmentItem | null>(null);
+
+  // Custom Delete Modal State
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deletingEquipment, setDeletingEquipment] = useState<EquipmentItem | null>(null);
 
   // Forms State
   const [formData, setFormData] = useState({
@@ -49,20 +54,30 @@ export default function EquipmentPage() {
     description: '',
   });
 
-  // Role check using AuthContext
   const userRole = typeof user?.role === 'object' ? user?.role?.name : user?.role;
   const isStaffOrAdmin = userRole === 'ADMIN' || userRole === 'STAFF';
 
+  const extractArray = (res: any): any[] => {
+    if (Array.isArray(res)) return res;
+    if (Array.isArray(res?.data)) return res.data;
+    return [];
+  };
+
   const fetchData = async () => {
+    setLoading(true);
     try {
-      const [eqRes, catRes] = await Promise.all([
-        api.get('/equipment'),
-        api.get('/equipment/categories').catch(() => ({ data: [] })), // Fixed route!
-      ]);
-      setEquipment(eqRes.data);
-      setCategories(catRes.data);
-    } catch {
-      console.warn('Failed to load equipment data');
+      const eqRes = await api.get('/equipment');
+      setEquipment(extractArray(eqRes.data));
+
+      try {
+        const catRes = await api.get('/equipment/categories');
+        setCategories(extractArray(catRes.data));
+      } catch {
+        const fallbackCatRes = await api.get('/categories');
+        setCategories(extractArray(fallbackCatRes.data));
+      }
+    } catch (err) {
+      console.error('Failed to load equipment or categories:', err);
     } finally {
       setLoading(false);
     }
@@ -72,32 +87,82 @@ export default function EquipmentPage() {
     fetchData();
   }, []);
 
-  const handleCreateEquipment = async (e: React.FormEvent) => {
+  const handleOpenAddModal = () => {
+    setEditingEquipment(null);
+    setFormData({ name: '', description: '', rentalPrice: '', deposit: '', stockQuantity: '', categoryId: '' });
+    setIsEquipmentModalOpen(true);
+  };
+
+  const handleOpenEditModal = (item: EquipmentItem) => {
+    setEditingEquipment(item);
+    setFormData({
+      name: item.name,
+      description: item.description || '',
+      rentalPrice: item.rentalPrice.toString(),
+      deposit: item.deposit.toString(),
+      stockQuantity: item.stockQuantity.toString(),
+      categoryId: item.category?.id || '',
+    });
+    setIsEquipmentModalOpen(true);
+  };
+
+  const handleSaveEquipment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.categoryId) {
       alert('Please select a category');
       return;
     }
 
+    const payload = {
+      ...formData,
+      rentalPrice: parseFloat(formData.rentalPrice),
+      deposit: parseFloat(formData.deposit),
+      stockQuantity: parseInt(formData.stockQuantity, 10),
+    };
+
     try {
-      await api.post('/equipment', {
-        ...formData,
-        rentalPrice: parseFloat(formData.rentalPrice),
-        deposit: parseFloat(formData.deposit),
-        stockQuantity: parseInt(formData.stockQuantity, 10),
-      });
+      if (editingEquipment) {
+        await api.patch(`/equipment/${editingEquipment.id}`, payload);
+      } else {
+        await api.post('/equipment', payload);
+      }
       setIsEquipmentModalOpen(false);
+      setEditingEquipment(null);
       setFormData({ name: '', description: '', rentalPrice: '', deposit: '', stockQuantity: '', categoryId: '' });
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to create equipment');
+      alert(err.response?.data?.message || 'Failed to save equipment');
+    }
+  };
+
+  // Open custom delete modal
+  const handleOpenDeleteModal = (item: EquipmentItem) => {
+    setDeletingEquipment(item);
+    setIsDeleteModalOpen(true);
+  };
+
+  // Confirm delete action
+  const confirmDeleteEquipment = async () => {
+    if (!deletingEquipment) return;
+
+    try {
+      await api.delete(`/equipment/${deletingEquipment.id}`);
+      setIsDeleteModalOpen(false);
+      setDeletingEquipment(null);
+      fetchData();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to delete equipment');
     }
   };
 
   const handleCreateCategory = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await api.post('/equipment/categories', categoryFormData);
+      try {
+        await api.post('/equipment/categories', categoryFormData);
+      } catch {
+        await api.post('/categories', categoryFormData);
+      }
       setIsCategoryModalOpen(false);
       setCategoryFormData({ name: '', description: '' });
       fetchData();
@@ -108,7 +173,7 @@ export default function EquipmentPage() {
 
   const filteredEquipment = equipment.filter((item) => {
     const matchesSearch =
-      item.name.toLowerCase().includes(search.toLowerCase()) ||
+      item.name?.toLowerCase().includes(search.toLowerCase()) ||
       item.description?.toLowerCase().includes(search.toLowerCase());
     const matchesCat = selectedCategory ? item.category?.id === selectedCategory : true;
     return matchesSearch && matchesCat;
@@ -157,7 +222,7 @@ export default function EquipmentPage() {
               Add Category
             </button>
             <button
-              onClick={() => setIsEquipmentModalOpen(true)}
+              onClick={handleOpenAddModal}
               className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg text-sm transition"
             >
               <Plus className="w-4 h-4" />
@@ -205,27 +270,48 @@ export default function EquipmentPage() {
                 </p>
               </div>
 
-              <div className="pt-3 border-t border-gray-100 flex items-center justify-between text-sm">
-                <div>
-                  <span className="text-gray-400 text-xs block">Daily Rate</span>
-                  <span className="font-bold text-blue-600">${item.rentalPrice}/day</span>
+              <div>
+                <div className="pt-3 border-t border-gray-100 flex items-center justify-between text-sm mb-3">
+                  <div>
+                    <span className="text-gray-400 text-xs block">Daily Rate</span>
+                    <span className="font-bold text-blue-600">${item.rentalPrice}/day</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-400 text-xs block">Deposit</span>
+                    <span className="font-semibold text-gray-700">${item.deposit}</span>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-gray-400 text-xs block">Deposit</span>
-                  <span className="font-semibold text-gray-700">${item.deposit}</span>
-                </div>
+
+                {isStaffOrAdmin && (
+                  <div className="flex gap-2 justify-end border-t pt-2">
+                    <button
+                      onClick={() => handleOpenEditModal(item)}
+                      className="flex items-center gap-1 text-xs text-gray-600 hover:text-blue-600 p-1.5 rounded hover:bg-gray-100 transition"
+                    >
+                      <Pencil className="w-3.5 h-3.5" /> Edit
+                    </button>
+                    <button
+                      onClick={() => handleOpenDeleteModal(item)}
+                      className="flex items-center gap-1 text-xs text-red-600 hover:text-red-700 p-1.5 rounded hover:bg-red-50 transition"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> Delete
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* Add Equipment Modal */}
+      {/* Add / Edit Equipment Modal */}
       {isEquipmentModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl max-w-md w-full p-6 space-y-4">
-            <h3 className="text-lg font-bold text-gray-900">Add New Equipment</h3>
-            <form onSubmit={handleCreateEquipment} className="space-y-3">
+            <h3 className="text-lg font-bold text-gray-900">
+              {editingEquipment ? 'Edit Equipment' : 'Add New Equipment'}
+            </h3>
+            <form onSubmit={handleSaveEquipment} className="space-y-3">
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Name</label>
                 <input
@@ -311,10 +397,44 @@ export default function EquipmentPage() {
                   type="submit"
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
                 >
-                  Save Equipment
+                  {editingEquipment ? 'Update Equipment' : 'Save Equipment'}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Delete Confirmation Modal */}
+      {isDeleteModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl max-w-sm w-full p-6 text-center space-y-4 shadow-xl">
+            <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">Delete Equipment?</h3>
+              <p className="text-sm text-gray-500 mt-1">
+                Are you sure you want to delete <span className="font-semibold text-gray-800">"{deletingEquipment?.name}"</span>? This action cannot be undone.
+              </p>
+            </div>
+
+            <div className="flex justify-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsDeleteModalOpen(false)}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteEquipment}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition"
+              >
+                Delete Item
+              </button>
+            </div>
           </div>
         </div>
       )}

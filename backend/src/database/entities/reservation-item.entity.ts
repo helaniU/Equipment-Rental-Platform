@@ -1,4 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
 import { Reservation } from './reservation.entity';
 import { Equipment } from './equipment.entity';
 
@@ -7,11 +13,15 @@ export class ReservationItem {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @ManyToOne(() => Reservation, (reservation) => reservation.items, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Reservation, (reservation) => reservation.items, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'reservation_id' })
   reservation: Reservation;
 
-  @ManyToOne(() => Equipment, (equipment) => equipment.reservationItems)
+  @ManyToOne(() => Equipment, (equipment) => equipment.reservationItems, {
+    onDelete: 'RESTRICT',
+  })
   @JoinColumn({ name: 'equipment_id' })
   equipment: Equipment;
 

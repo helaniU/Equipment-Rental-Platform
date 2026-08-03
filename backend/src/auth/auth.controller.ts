@@ -1,4 +1,4 @@
-import { Controller, Post, Body } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
@@ -18,26 +18,30 @@ export class AuthController {
   }
 
   @Post('login')
+  @HttpCode(HttpStatus.OK) // <--- Fixes 201 Created -> 200 OK
   @ApiOperation({ summary: 'Log in with email and password' })
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
   }
 
   @Post('refresh')
+  @HttpCode(HttpStatus.OK) // <--- Standard 200 OK for token refreshes
   @ApiOperation({ summary: 'Refresh access token' })
   refresh(@Body() dto: RefreshTokenDto) {
     return this.authService.refreshToken(dto.refreshToken);
   }
 
   @Post('forgot-password')
-    @ApiOperation({ summary: 'Request password reset token' })
-    forgotPassword(@Body() dto: ForgotPasswordDto) {
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Request password reset token' })
+  forgotPassword(@Body() dto: ForgotPasswordDto) {
     return this.authService.forgotPassword(dto);
-    }
+  }
 
-    @Post('reset-password')
-    @ApiOperation({ summary: 'Reset password using token' })
-    resetPassword(@Body() dto: ResetPasswordDto) {
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reset password using token' })
+  resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto);
-    }
+  }
 }

@@ -1,83 +1,61 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { InventoryLog, InventoryActionType } from '../database/entities/inventory-log.entity';
 import { Equipment } from '../database/entities/equipment.entity';
 import { User } from '../database/entities/user.entity';
-import { RecordInventoryActionDto, InventoryActionType } from './dto/inventory-action.dto';
-import { ActivityLog, ActionType } from '../database/entities/activity-log.entity';
+import { RecordInventoryActionDto } from './dto/inventory.dto';
 
 @Injectable()
 export class InventoryService {
   constructor(
-    @InjectRepository(Equipment) private equipmentRepo: Repository<Equipment>,
-    @InjectRepository(ActivityLog) private logRepo: Repository<ActivityLog>,
+    @InjectRepository(InventoryLog)
+    private readonly logRepo: Repository<InventoryLog>,
+    @InjectRepository(Equipment)
+    private readonly equipmentRepo: Repository<Equipment>,
   ) {}
 
-  async findAll() {
-    const items = await this.equipmentRepo.find({
-      relations: ['category'],
-    });
-
-    return items.map((item) => ({
-      id: item.id,
-      name: item.name,
-      sku: item['sku'] || `EQ-${item.id.slice(0, 6).toUpperCase()}`,
-      stockQuantity: item.stockQuantity,
-      availableQuantity: item.isAvailable ? item.stockQuantity : 0,
-      maintenanceQuantity: item['maintenanceQuantity'] || 0,
-      location: item['location'] || 'Warehouse A',
-      category: item.category?.name || 'General',
-    }));
-  }
-
-  async recordAction(operator: User, dto: RecordInventoryActionDto) {
+  async recordAction(user: User, dto: RecordInventoryActionDto) {
     const equipment = await this.equipmentRepo.findOne({ where: { id: dto.equipmentId } });
-    if (!equipment) throw new NotFoundException('Equipment not found');
+    if (!equipment) throw new NotFoundException('Equipment item not found');
 
-    switch (dto.action) {
-      case InventoryActionType.RECEIVE:
-        equipment.stockQuantity += dto.quantity;
-        break;
-
-      case InventoryActionType.RELEASE:
-      case InventoryActionType.DAMAGE:
-      case InventoryActionType.MAINTENANCE:
-        if (equipment.stockQuantity < dto.quantity) {
-          throw new BadRequestException('Insufficient stock for this action');
-        }
-        equipment.stockQuantity -= dto.quantity;
-        break;
+    // Adjust stock or availability depending on action type
+    if (dto.action === InventoryActionType.MAINTENANCE || dto.action === InventoryActionType.DAMAGE) {
+      if (equipment.stockQuantity < dto.quantity) {
+        throw new BadRequestException(`Cannot perform action: quantity exceeds current available stock (${equipment.stockQuantity})`);
+      }
+      equipment.stockQuantity -= dto.quantity;
+      if (equipment.stockQuantity <= 0) {
+        equipment.isAvailable = false;
+      }
+      await this.equipmentRepo.save(equipment);
+    } else if (dto.action === InventoryActionType.RECEIVE) {
+      equipment.stockQuantity += dto.quantity;
+      equipment.isAvailable = true;
+      await this.equipmentRepo.save(equipment);
     }
 
-    equipment.isAvailable = equipment.stockQuantity > 0;
-    await this.equipmentRepo.save(equipment);
-
-    // Save activity log matching your entity schema
-    const actionKey = `INVENTORY_${dto.action}` as keyof typeof ActionType;
-    const actionValue = ActionType[actionKey] ?? ActionType.UPDATE;
-
     const log = this.logRepo.create({
-      action: actionValue,
-      details: { 
-        userId: operator.id,
-        equipmentId: equipment.id,
-        equipmentName: equipment.name,
-        actionType: dto.action, 
-        quantity: dto.quantity, 
-        notes: dto.notes, 
-        reservationId: dto.reservationId 
-      },
+      equipment,
+      performedBy: user,
+      action: dto.action,
+      quantity: dto.quantity,
+      notes: dto.notes,
+      repairCost: dto.repairCost,
     });
-    await this.logRepo.save(log);
 
-    return { message: `Inventory action ${dto.action} processed successfully`, equipment };
+    return this.logRepo.save(log);
   }
 
-  async getStockLogs(equipmentId: string) {
-    return this.logRepo
-      .createQueryBuilder('log')
-      .where("log.details ->> 'equipmentId' = :equipmentId", { equipmentId })
-      .orderBy('log.createdAt', 'DESC')
-      .getMany();
+  async findAllLogs(equipmentId?: string) {
+    const query = this.logRepo.createQueryBuilder('log')
+      .leftJoinAndSelect('log.equipment', 'equipment')
+      .leftJoinAndSelect('log.performedBy', 'user');
+
+    if (equipmentId) {
+      query.andWhere('log.equipmentId = :equipmentId', { equipmentId });
+    }
+
+    return query.orderBy('log.createdAt', 'DESC').getMany();
   }
 }

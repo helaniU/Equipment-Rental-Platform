@@ -1,6 +1,10 @@
+import { IsEnum, IsNotEmpty } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { UploadType } from '../../database/entities/upload.entity';
 
-export class UploadFileDto {
-  @ApiProperty({ type: 'string', format: 'binary', description: 'File to upload (Image, PDF, Document)' })
-  file!: any;
+export class UploadDocumentDto {
+  @ApiProperty({ enum: UploadType, example: UploadType.IDENTITY_DOCUMENT })
+  @IsEnum(UploadType)
+  @IsNotEmpty()
+  type: UploadType;
 }

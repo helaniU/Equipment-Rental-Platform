@@ -5,7 +5,7 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
-  OneToMany,
+  OneToMany, // <--- ADDED MISSING IMPORT
   JoinColumn,
 } from 'typeorm';
 import { Category } from './category.entity';
@@ -19,33 +19,39 @@ export class Equipment {
   @Column()
   name: string;
 
-  @Column('text')
+  @Column({ type: 'text', nullable: true })
   description: string;
-
-  @Column('decimal', { precision: 10, scale: 2 })
-  rentalPrice: number;
-
-  @Column('decimal', { precision: 10, scale: 2 })
-  deposit: number;
-
-  @Column('int')
-  stockQuantity: number;
-
-  @Column({ default: true })
-  isAvailable: boolean;
-
-  @Column('jsonb', { nullable: true })
-  specifications: Record<string, any>;
 
   @Column('simple-array', { nullable: true })
   images: string[];
 
-  @ManyToOne(() => Category, (category) => category.equipment, { eager: true })
-  @JoinColumn({ name: 'category_id' })
-  category: Category;
+  @Column({ type: 'decimal', precision: 10, scale: 2 })
+  rentalPrice: number;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2 })
+  deposit: number;
+
+  @Column({ type: 'int', default: 1 })
+  stockQuantity: number;
+
+  @Column({ type: 'boolean', default: true })
+  isAvailable: boolean;
+
+  @Column({ type: 'jsonb', nullable: true })
+  specifications: Record<string, any>;
 
   @OneToMany(() => ReservationItem, (item) => item.equipment)
   reservationItems: ReservationItem[];
+
+  @ManyToOne(() => Category, (category) => category.equipment, {
+    onDelete: 'SET NULL',
+    eager: true,
+  })
+  @JoinColumn({ name: 'categoryId' })
+  category: Category;
+
+  @Column({ nullable: true })
+  categoryId: string;
 
   @CreateDateColumn()
   createdAt: Date;

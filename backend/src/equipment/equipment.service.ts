@@ -10,79 +10,79 @@ import { CreateCategoryDto } from './dto/create-category.dto';
 @Injectable()
 export class EquipmentService {
   constructor(
-    @InjectRepository(Equipment) private equipmentRepo: Repository<Equipment>,
-    @InjectRepository(Category) private categoryRepo: Repository<Category>,
+    @InjectRepository(Equipment)
+    private readonly equipmentRepo: Repository<Equipment>,
+    @InjectRepository(Category)
+    private readonly categoryRepo: Repository<Category>,
   ) {}
 
-  // Category Methods
+  // --- Category Operations ---
   async createCategory(dto: CreateCategoryDto) {
     const category = this.categoryRepo.create(dto);
     return this.categoryRepo.save(category);
   }
 
   async findAllCategories() {
-    return this.categoryRepo.find();
+    return this.categoryRepo.find({ relations: ['equipment'] });
   }
 
-  // Equipment Methods
-  async create(dto: CreateEquipmentDto) {
+  async updateCategory(id: string, dto: CreateCategoryDto) {
+    const category = await this.categoryRepo.findOne({ where: { id } });
+    if (!category) throw new NotFoundException('Category not found');
+    Object.assign(category, dto);
+    return this.categoryRepo.save(category);
+  }
+
+  async deleteCategory(id: string) {
+    const result = await this.categoryRepo.delete(id);
+    if (result.affected === 0) throw new NotFoundException('Category not found');
+    return { message: 'Category deleted successfully' };
+  }
+
+  // --- Equipment Operations ---
+  async createEquipment(dto: CreateEquipmentDto) {
     const category = await this.categoryRepo.findOne({ where: { id: dto.categoryId } });
-    if (!category) {
-      throw new NotFoundException('Category not found');
-    }
+    if (!category) throw new NotFoundException('Category not found');
 
-    const item = this.equipmentRepo.create({
-      ...dto,
-      category,
-      isAvailable: dto.stockQuantity > 0,
-    });
-
-    return this.equipmentRepo.save(item);
+    const equipment = this.equipmentRepo.create({ ...dto, category });
+    return this.equipmentRepo.save(equipment);
   }
 
-  async findAll(categoryId?: string) {
+  async findAllEquipment(categoryId?: string, search?: string) {
     const query = this.equipmentRepo.createQueryBuilder('equipment')
       .leftJoinAndSelect('equipment.category', 'category');
 
     if (categoryId) {
-      query.where('category.id = :categoryId', { categoryId });
+      query.andWhere('equipment.categoryId = :categoryId', { categoryId });
+    }
+
+    if (search) {
+      query.andWhere('equipment.name ILIKE :search OR equipment.description ILIKE :search', { search: `%${search}%` });
     }
 
     return query.getMany();
   }
 
-  async findOne(id: string) {
-    const item = await this.equipmentRepo.findOne({
-      where: { id },
-      relations: ['category'],
-    });
-
-    if (!item) {
-      throw new NotFoundException(`Equipment with ID ${id} not found`);
-    }
-
-    return item;
+  async findOneEquipment(id: string) {
+    const equipment = await this.equipmentRepo.findOne({ where: { id }, relations: ['category'] });
+    if (!equipment) throw new NotFoundException('Equipment item not found');
+    return equipment;
   }
 
-  async update(id: string, dto: UpdateEquipmentDto) {
-    const item = await this.findOne(id);
-
+  async updateEquipment(id: string, dto: UpdateEquipmentDto) {
+    const equipment = await this.findOneEquipment(id);
     if (dto.categoryId) {
       const category = await this.categoryRepo.findOne({ where: { id: dto.categoryId } });
       if (!category) throw new NotFoundException('Category not found');
-      item.category = category;
+      equipment.category = category;
     }
-
-    Object.assign(item, dto);
-    if (dto.stockQuantity !== undefined) {
-      item.isAvailable = dto.stockQuantity > 0;
-    }
-
-    return this.equipmentRepo.save(item);
+    Object.assign(equipment, dto);
+    return this.equipmentRepo.save(equipment);
   }
 
-  async remove(id: string) {
-    const item = await this.findOne(id);
-    return this.equipmentRepo.remove(item);
+  async deleteEquipment(id: string) {
+    const result = await this.equipmentRepo.delete(id);
+    if (result.affected === 0) throw new NotFoundException('Equipment item not found');
+    return { message: 'Equipment deleted successfully' };
   }
 }
