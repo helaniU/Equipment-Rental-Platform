@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Equipment } from '../database/entities/equipment.entity';
@@ -81,8 +81,14 @@ export class EquipmentService {
   }
 
   async deleteEquipment(id: string) {
-    const result = await this.equipmentRepo.delete(id);
-    if (result.affected === 0) throw new NotFoundException('Equipment item not found');
-    return { message: 'Equipment deleted successfully' };
+    const equipment = await this.equipmentRepo.findOne({ where: { id } });
+    if (!equipment) throw new NotFoundException('Equipment item not found');
+
+    try {
+      await this.equipmentRepo.remove(equipment);
+      return { message: 'Equipment deleted successfully' };
+    } catch (error) {
+      throw new BadRequestException('Failed to delete equipment. Please ensure related records are handled.');
+    }
   }
 }

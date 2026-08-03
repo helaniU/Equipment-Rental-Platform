@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
-import { Calendar, CheckCircle2, XCircle, Clock, Plus, CreditCard, AlertCircle } from 'lucide-react';
+import { Calendar, CheckCircle2, XCircle, Clock, Plus, CreditCard, AlertTriangle } from 'lucide-react';
 
 interface ReservationItem {
   id: string;
@@ -17,6 +17,7 @@ interface Reservation {
   returnDate: string;
   totalPrice: number;
   status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'ACTIVE' | 'RETURNED' | 'CANCELLED';
+  rejectionReason?: string;
   items?: ReservationItem[];
   customer?: { fullName?: string; name?: string; email?: string };
   user?: { fullName?: string; name?: string; email?: string };
@@ -40,6 +41,11 @@ export default function ReservationsPage() {
   // Custom Payment Message Box Modal State
   const [selectedPaymentReservation, setSelectedPaymentReservation] = useState<Reservation | null>(null);
   const [isPaying, setIsPaying] = useState(false);
+
+  // Rejection Reason Modal State
+  const [rejectReservationId, setRejectReservationId] = useState<string | null>(null);
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [isSubmittingReject, setIsSubmittingReject] = useState(false);
 
   const roleName = typeof user?.role === 'object' ? user?.role?.name : user?.role;
   const isStaffOrAdmin = ['ADMIN', 'STAFF'].includes(roleName || '');
@@ -70,6 +76,12 @@ export default function ReservationsPage() {
   }, []);
 
   const handleStatusChange = async (id: string, status: string) => {
+    if (status === 'REJECTED') {
+      setRejectReservationId(id);
+      setRejectionReason('');
+      return;
+    }
+
     try {
       await api.patch(`/reservations/${id}/status`, { status });
       fetchReservations();
@@ -78,12 +90,25 @@ export default function ReservationsPage() {
     }
   };
 
-  // Open Custom Payment Dialog Box
-  const handleOpenPaymentModal = (res: Reservation) => {
-    setSelectedPaymentReservation(res);
+  const confirmRejection = async () => {
+    if (!rejectReservationId || !rejectionReason.trim()) return;
+
+    setIsSubmittingReject(true);
+    try {
+      await api.patch(`/reservations/${rejectReservationId}/status`, {
+        status: 'REJECTED',
+        rejectionReason: rejectionReason.trim(),
+      });
+      setRejectReservationId(null);
+      setRejectionReason('');
+      fetchReservations();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Failed to reject reservation');
+    } finally {
+      setIsSubmittingReject(false);
+    }
   };
 
-  // Process Mock Payment via `/payments/process`
   const confirmPayment = async () => {
     if (!selectedPaymentReservation) return;
 
@@ -92,8 +117,8 @@ export default function ReservationsPage() {
       await api.post('/payments/process', {
         reservationId: selectedPaymentReservation.id,
         amount: Number(selectedPaymentReservation.totalPrice),
-        type: 'RENTAL_FEE', // Updated enum value
-        paymentMethod: 'MOCK_CARD',
+        type: 'RENTAL_FEE',
+        paymentMethod: 'MOCK_CARD'
       });
 
       setSelectedPaymentReservation(null);
@@ -128,18 +153,29 @@ export default function ReservationsPage() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
+  const getStatusBadge = (res: Reservation) => {
+    switch (res.status) {
       case 'APPROVED':
       case 'ACTIVE':
-        return <span className="px-2.5 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1 w-fit"><CheckCircle2 className="w-3.5 h-3.5" /> {status}</span>;
+        return <span className="px-2.5 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1 w-fit"><CheckCircle2 className="w-3.5 h-3.5" /> {res.status}</span>;
       case 'PENDING':
-        return <span className="px-2.5 py-1 bg-amber-100 text-amber-700 text-xs font-semibold rounded-full flex items-center gap-1 w-fit"><Clock className="w-3.5 h-3.5" /> {status}</span>;
+        return <span className="px-2.5 py-1 bg-amber-100 text-amber-700 text-xs font-semibold rounded-full flex items-center gap-1 w-fit"><Clock className="w-3.5 h-3.5" /> {res.status}</span>;
       case 'REJECTED':
       case 'CANCELLED':
-        return <span className="px-2.5 py-1 bg-red-100 text-red-700 text-xs font-semibold rounded-full flex items-center gap-1 w-fit"><XCircle className="w-3.5 h-3.5" /> {status}</span>;
+        return (
+          <div className="space-y-1">
+            <span className="px-2.5 py-1 bg-red-100 text-red-700 text-xs font-semibold rounded-full flex items-center gap-1 w-fit">
+              <XCircle className="w-3.5 h-3.5" /> {res.status}
+            </span>
+            {res.rejectionReason && (
+              <p className="text-[11px] text-red-600 bg-red-50 border border-red-200 rounded px-2 py-0.5 max-w-xs">
+                <span className="font-semibold">Reason:</span> {res.rejectionReason}
+              </p>
+            )}
+          </div>
+        );
       default:
-        return <span className="px-2.5 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full w-fit">{status}</span>;
+        return <span className="px-2.5 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full w-fit">{res.status}</span>;
     }
   };
 
@@ -176,7 +212,7 @@ export default function ReservationsPage() {
                 <th className="p-4">Rental Period</th>
                 <th className="p-4">Total</th>
                 <th className="p-4">Status</th>
-                <th className="p-4 text-right">Actions</th>
+                <th className="p-4 text-right"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -198,10 +234,9 @@ export default function ReservationsPage() {
                       {new Date(res.pickupDate).toLocaleDateString()} — {new Date(res.returnDate).toLocaleDateString()}
                     </td>
                     <td className="p-4 font-bold text-blue-600">${res.totalPrice}</td>
-                    <td className="p-4">{getStatusBadge(res.status)}</td>
+                    <td className="p-4">{getStatusBadge(res)}</td>
                     
                     <td className="p-4 text-right space-x-2">
-                      {/* ADMIN / STAFF Actions */}
                       {isStaffOrAdmin && res.status === 'PENDING' && (
                         <>
                           <button
@@ -219,23 +254,14 @@ export default function ReservationsPage() {
                         </>
                       )}
 
-                      {/* CUSTOMER Action: Only show "Pay Now" when reservation status is APPROVED */}
                       {!isStaffOrAdmin && res.status === 'APPROVED' && (
                         <button
-                          onClick={() => handleOpenPaymentModal(res)}
+                          onClick={() => setSelectedPaymentReservation(res)}
                           className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition inline-flex items-center gap-1.5 shadow-sm"
                         >
                           <CreditCard className="w-3.5 h-3.5" />
                           Pay Now
                         </button>
-                      )}
-
-                      {!isStaffOrAdmin && res.status === 'PENDING' && (
-                        <span className="text-xs text-gray-400 italic">Awaiting Approval</span>
-                      )}
-
-                      {!isStaffOrAdmin && res.status === 'ACTIVE' && (
-                        <span className="text-xs text-green-600 font-medium">Paid & Active</span>
                       )}
                     </td>
                   </tr>
@@ -243,6 +269,54 @@ export default function ReservationsPage() {
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* REJECTION REASON MODAL */}
+      {rejectReservationId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl max-w-sm w-full p-6 space-y-4 shadow-xl">
+            <div className="text-center">
+              <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900">Reject Reservation</h3>
+              <p className="text-xs text-gray-500 mt-1">
+                Please state the reason for rejecting this booking request.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Reason for Rejection</label>
+              <textarea
+                required
+                rows={3}
+                placeholder="e.g., Equipment out of stock, maintenance required..."
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                className="w-full border rounded-lg p-2.5 text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-500"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setRejectReservationId(null)}
+                disabled={isSubmittingReject}
+                className="px-4 py-2 border rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50 transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmRejection}
+                disabled={isSubmittingReject || !rejectionReason.trim()}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg text-xs font-semibold hover:bg-red-700 transition disabled:opacity-50"
+              >
+                {isSubmittingReject ? 'Rejecting...' : 'Confirm Rejection'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
-import { Search, Filter, Plus, Package, Tag, Pencil, Trash2, AlertTriangle } from 'lucide-react';
+import { Search, Filter, Plus, Package, Tag, Pencil, Trash2, AlertTriangle, ImageIcon, Loader2, CheckCircle2 } from 'lucide-react';
 
 interface Category {
   id: string;
@@ -19,6 +19,7 @@ interface EquipmentItem {
   deposit: number;
   stockQuantity: number;
   isAvailable: boolean;
+  images?: string[];
   category?: Category;
 }
 
@@ -35,9 +36,13 @@ export default function EquipmentPage() {
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [editingEquipment, setEditingEquipment] = useState<EquipmentItem | null>(null);
 
-  // Custom Delete Modal State
+  // Delete Modal State
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deletingEquipment, setDeletingEquipment] = useState<EquipmentItem | null>(null);
+
+  // File Uploading States
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
 
   // Forms State
   const [formData, setFormData] = useState({
@@ -70,10 +75,10 @@ export default function EquipmentPage() {
       setEquipment(extractArray(eqRes.data));
 
       try {
-        const catRes = await api.get('/equipment/categories');
+        const catRes = await api.get('/categories');
         setCategories(extractArray(catRes.data));
       } catch {
-        const fallbackCatRes = await api.get('/categories');
+        const fallbackCatRes = await api.get('/equipment/categories');
         setCategories(extractArray(fallbackCatRes.data));
       }
     } catch (err) {
@@ -90,6 +95,7 @@ export default function EquipmentPage() {
   const handleOpenAddModal = () => {
     setEditingEquipment(null);
     setFormData({ name: '', description: '', rentalPrice: '', deposit: '', stockQuantity: '', categoryId: '' });
+    setUploadedImageUrl(null);
     setIsEquipmentModalOpen(true);
   };
 
@@ -98,12 +104,47 @@ export default function EquipmentPage() {
     setFormData({
       name: item.name,
       description: item.description || '',
-      rentalPrice: item.rentalPrice.toString(),
-      deposit: item.deposit.toString(),
-      stockQuantity: item.stockQuantity.toString(),
+      rentalPrice: item.rentalPrice ? item.rentalPrice.toString() : '0',
+      deposit: item.deposit ? item.deposit.toString() : '0',
+      stockQuantity: item.stockQuantity ? item.stockQuantity.toString() : '0',
       categoryId: item.category?.id || '',
     });
+    setUploadedImageUrl(item.images && item.images.length > 0 ? item.images[0] : null);
     setIsEquipmentModalOpen(true);
+  };
+
+  // Image Upload Handler
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert('File size exceeds 5MB limit.');
+      return;
+    }
+
+    setUploadingImage(true);
+
+    const uploadData = new FormData();
+    uploadData.append('file', file);
+    uploadData.append('type', 'EQUIPMENT_IMAGE');
+
+    try {
+      const response = await api.post('/uploads/document', uploadData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
+      const uploadedPath = response.data.filePath || response.data.url;
+      const fullUrl = uploadedPath.startsWith('http')
+        ? uploadedPath
+        : `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}${uploadedPath}`;
+      setUploadedImageUrl(fullUrl);
+    } catch (error) {
+      console.error('Failed to upload image:', error);
+      alert('Failed to upload image. Please try again.');
+    } finally {
+      setUploadingImage(false);
+    }
   };
 
   const handleSaveEquipment = async (e: React.FormEvent) => {
@@ -114,34 +155,36 @@ export default function EquipmentPage() {
     }
 
     const payload = {
-      ...formData,
-      rentalPrice: parseFloat(formData.rentalPrice),
-      deposit: parseFloat(formData.deposit),
-      stockQuantity: parseInt(formData.stockQuantity, 10),
+      name: formData.name,
+      description: formData.description,
+      rentalPrice: parseFloat(formData.rentalPrice) || 0,
+      deposit: parseFloat(formData.deposit) || 0,
+      stockQuantity: parseInt(formData.stockQuantity, 10) || 0,
+      categoryId: formData.categoryId,
+      images: uploadedImageUrl ? [uploadedImageUrl] : [],
     };
 
     try {
       if (editingEquipment) {
-        await api.patch(`/equipment/${editingEquipment.id}`, payload);
+        await api.put(`/equipment/${editingEquipment.id}`, payload);
       } else {
         await api.post('/equipment', payload);
       }
       setIsEquipmentModalOpen(false);
       setEditingEquipment(null);
       setFormData({ name: '', description: '', rentalPrice: '', deposit: '', stockQuantity: '', categoryId: '' });
+      setUploadedImageUrl(null);
       fetchData();
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to save equipment');
     }
   };
 
-  // Open custom delete modal
   const handleOpenDeleteModal = (item: EquipmentItem) => {
     setDeletingEquipment(item);
     setIsDeleteModalOpen(true);
   };
 
-  // Confirm delete action
   const confirmDeleteEquipment = async () => {
     if (!deletingEquipment) return;
 
@@ -159,9 +202,9 @@ export default function EquipmentPage() {
     e.preventDefault();
     try {
       try {
-        await api.post('/equipment/categories', categoryFormData);
-      } catch {
         await api.post('/categories', categoryFormData);
+      } catch {
+        await api.post('/equipment/categories', categoryFormData);
       }
       setIsCategoryModalOpen(false);
       setCategoryFormData({ name: '', description: '' });
@@ -248,6 +291,11 @@ export default function EquipmentPage() {
               className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm hover:shadow-md transition flex flex-col justify-between"
             >
               <div>
+                {item.images && item.images.length > 0 && (
+                  <div className="w-full h-40 mb-3 bg-gray-50 rounded-lg overflow-hidden flex items-center justify-center border border-gray-100">
+                    <img src={item.images[0]} alt={item.name} className="h-full w-full object-contain" />
+                  </div>
+                )}
                 <div className="flex justify-between items-start mb-2">
                   <h3 className="font-bold text-gray-900 text-lg">{item.name}</h3>
                   <span
@@ -274,11 +322,11 @@ export default function EquipmentPage() {
                 <div className="pt-3 border-t border-gray-100 flex items-center justify-between text-sm mb-3">
                   <div>
                     <span className="text-gray-400 text-xs block">Daily Rate</span>
-                    <span className="font-bold text-blue-600">${item.rentalPrice}/day</span>
+                    <span className="font-bold text-blue-600">LKR {item.rentalPrice}/day</span>
                   </div>
                   <div>
                     <span className="text-gray-400 text-xs block">Deposit</span>
-                    <span className="font-semibold text-gray-700">${item.deposit}</span>
+                    <span className="font-semibold text-gray-700">LKR {item.deposit}</span>
                   </div>
                 </div>
 
@@ -307,7 +355,7 @@ export default function EquipmentPage() {
       {/* Add / Edit Equipment Modal */}
       {isEquipmentModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-md w-full p-6 space-y-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-bold text-gray-900">
               {editingEquipment ? 'Edit Equipment' : 'Add New Equipment'}
             </h3>
@@ -319,7 +367,7 @@ export default function EquipmentPage() {
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full border rounded-lg p-2 text-sm text-gray-900"
+                  className="w-full border rounded-lg p-2 text-sm text-gray-900 focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
@@ -329,7 +377,7 @@ export default function EquipmentPage() {
                   required
                   value={formData.categoryId}
                   onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
-                  className="w-full border rounded-lg p-2 text-sm text-gray-900"
+                  className="w-full border rounded-lg p-2 text-sm text-gray-900 focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Select a Category</option>
                   {categories.map((c) => (
@@ -345,31 +393,32 @@ export default function EquipmentPage() {
                 <textarea
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full border rounded-lg p-2 text-sm text-gray-900"
+                  className="w-full border rounded-lg p-2 text-sm text-gray-900 focus:ring-2 focus:ring-blue-500"
+                  rows={2}
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Price / Day ($)</label>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Price / Day (LKR)</label>
                   <input
                     type="number"
                     required
                     step="0.01"
                     value={formData.rentalPrice}
                     onChange={(e) => setFormData({ ...formData, rentalPrice: e.target.value })}
-                    className="w-full border rounded-lg p-2 text-sm text-gray-900"
+                    className="w-full border rounded-lg p-2 text-sm text-gray-900 focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Deposit ($)</label>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Deposit (LKR)</label>
                   <input
                     type="number"
                     required
                     step="0.01"
                     value={formData.deposit}
                     onChange={(e) => setFormData({ ...formData, deposit: e.target.value })}
-                    className="w-full border rounded-lg p-2 text-sm text-gray-900"
+                    className="w-full border rounded-lg p-2 text-sm text-gray-900 focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               </div>
@@ -381,8 +430,42 @@ export default function EquipmentPage() {
                   required
                   value={formData.stockQuantity}
                   onChange={(e) => setFormData({ ...formData, stockQuantity: e.target.value })}
-                  className="w-full border rounded-lg p-2 text-sm text-gray-900"
+                  className="w-full border rounded-lg p-2 text-sm text-gray-900 focus:ring-2 focus:ring-blue-500"
                 />
+              </div>
+
+              {/* File Upload Dropzone */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Equipment Image</label>
+                <div className="relative border-2 border-dashed border-gray-300 rounded-lg p-3 flex flex-col items-center justify-center min-h-[110px] bg-gray-50 hover:bg-gray-100 transition cursor-pointer">
+                  {uploadedImageUrl ? (
+                    <div className="relative w-full h-28">
+                      <img src={uploadedImageUrl} alt="Uploaded" className="w-full h-full object-contain rounded-md" />
+                    </div>
+                  ) : (
+                    <div className="text-center space-y-1">
+                      {uploadingImage ? (
+                        <Loader2 className="w-6 h-6 text-blue-600 animate-spin mx-auto" />
+                      ) : (
+                        <ImageIcon className="w-6 h-6 text-gray-400 mx-auto" />
+                      )}
+                      <p className="text-xs font-medium text-blue-600">Click to upload image</p>
+                      <p className="text-[10px] text-gray-400">PNG, JPG up to 5MB</p>
+                    </div>
+                  )}
+                  <input
+                    type="file"
+                    accept="image/png, image/jpeg, image/webp"
+                    onChange={handleFileChange}
+                    disabled={uploadingImage}
+                    className="absolute inset-0 opacity-0 cursor-pointer"
+                  />
+                </div>
+                {uploadedImageUrl && (
+                  <p className="text-[11px] text-emerald-600 font-medium mt-1 flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Image uploaded successfully
+                  </p>
+                )}
               </div>
 
               <div className="flex justify-end gap-2 pt-3">
@@ -395,7 +478,8 @@ export default function EquipmentPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
+                  disabled={uploadingImage}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50"
                 >
                   {editingEquipment ? 'Update Equipment' : 'Save Equipment'}
                 </button>
@@ -405,7 +489,7 @@ export default function EquipmentPage() {
         </div>
       )}
 
-      {/* Custom Delete Confirmation Modal */}
+      {/* Delete Confirmation Modal */}
       {isDeleteModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl max-w-sm w-full p-6 text-center space-y-4 shadow-xl">
@@ -415,7 +499,7 @@ export default function EquipmentPage() {
             <div>
               <h3 className="text-lg font-bold text-gray-900">Delete Equipment?</h3>
               <p className="text-sm text-gray-500 mt-1">
-                Are you sure you want to delete <span className="font-semibold text-gray-800">"{deletingEquipment?.name}"</span>? This action cannot be undone.
+                Are you sure you want to delete <span className="font-semibold text-gray-800">"{deletingEquipment?.name}"</span>?
               </p>
             </div>
 
@@ -423,16 +507,16 @@ export default function EquipmentPage() {
               <button
                 type="button"
                 onClick={() => setIsDeleteModalOpen(false)}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
+                className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={confirmDeleteEquipment}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition"
+                className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700"
               >
-                Delete Item
+                Delete
               </button>
             </div>
           </div>
@@ -450,7 +534,7 @@ export default function EquipmentPage() {
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Heavy Machinery, Power Tools"
+                  placeholder="e.g. Power Tools"
                   value={categoryFormData.name}
                   onChange={(e) => setCategoryFormData({ ...categoryFormData, name: e.target.value })}
                   className="w-full border rounded-lg p-2 text-sm text-gray-900"
@@ -460,7 +544,7 @@ export default function EquipmentPage() {
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Description</label>
                 <textarea
-                  placeholder="Brief description of category"
+                  placeholder="Brief description"
                   value={categoryFormData.description}
                   onChange={(e) => setCategoryFormData({ ...categoryFormData, description: e.target.value })}
                   className="w-full border rounded-lg p-2 text-sm text-gray-900"

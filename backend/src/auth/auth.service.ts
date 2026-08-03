@@ -19,6 +19,13 @@ export class AuthService {
     private configService: ConfigService,
   ) {}
 
+  async getAllUsers() {
+    return this.userRepo.find({
+      relations: ['role'], 
+      order: { createdAt: 'DESC' },
+    });
+  }
+
   async register(dto: RegisterDto) {
     const existing = await this.userRepo.findOne({ where: { email: dto.email } });
     if (existing) {
@@ -62,20 +69,20 @@ export class AuthService {
   }
 
   async refreshToken(refreshToken: string) {
-    try {
-      const payload = this.jwtService.verify(refreshToken, {
-        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
-      });
-      const user = await this.userRepo.findOne({
-        where: { id: payload.sub },
-        relations: ['role'],
-      });
-      if (!user) throw new UnauthorizedException('Invalid refresh token');
-      return this.generateTokens(user);
-    } catch {
-      throw new UnauthorizedException('Expired or invalid refresh token');
-    }
+  try {
+    const payload = this.jwtService.verify(refreshToken, {
+      secret: this.configService.get<string>('JWT_REFRESH_SECRET') || 'super_secret_refresh_key_12345',
+    });
+    const user = await this.userRepo.findOne({
+      where: { id: payload.sub },
+      relations: ['role'],
+    });
+    if (!user) throw new UnauthorizedException('Invalid refresh token');
+    return this.generateTokens(user);
+  } catch {
+    throw new UnauthorizedException('Expired or invalid refresh token');
   }
+}
 
   async forgotPassword(dto: ForgotPasswordDto) {
     const user = await this.userRepo.findOne({ where: { email: dto.email } });

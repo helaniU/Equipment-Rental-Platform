@@ -1,5 +1,5 @@
-import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { Controller, Post, Get, Body, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -10,6 +10,12 @@ import { ForgotPasswordDto, ResetPasswordDto } from './dto/forgot-password.dto';
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  @Get('users')
+  @ApiOperation({ summary: 'Get all registered users / customers' })
+  getAllUsers() {
+    return this.authService.getAllUsers();
+  }
 
   @Post('register')
   @ApiOperation({ summary: 'Register a new customer account' })

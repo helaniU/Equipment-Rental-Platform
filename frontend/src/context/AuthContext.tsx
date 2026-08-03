@@ -8,9 +8,9 @@ export interface User {
   id: string;
   email: string;
   fullName?: string;
-  role: {
-    name: string;
-  } | string;
+  phone?: string;        
+  role?: string | { id?: string; name: string };
+  roleName?: string;
 }
 
 interface AuthContextType {

@@ -20,7 +20,7 @@ export class ReservationItem {
   reservation: Reservation;
 
   @ManyToOne(() => Equipment, (equipment) => equipment.reservationItems, {
-    onDelete: 'RESTRICT',
+    onDelete: 'CASCADE', // 
   })
   @JoinColumn({ name: 'equipment_id' })
   equipment: Equipment;

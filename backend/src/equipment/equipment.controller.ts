@@ -1,4 +1,4 @@
-//import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { EquipmentService } from './equipment.service';
 import { CreateEquipmentDto } from './dto/create-equipment.dto';
@@ -8,7 +8,6 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RoleType } from '../database/entities/role.entity';
-import { Controller, Get, Post, Put, Body, Patch, Param, Delete, Query, UseGuards } from '@nestjs/common';
 
 @ApiTags('Equipment & Categories')
 @Controller()
@@ -52,6 +51,7 @@ export class EquipmentController {
   }
 
   @Put('categories/:id')
+  @Patch('categories/:id')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(RoleType.ADMIN, RoleType.STAFF)
@@ -79,6 +79,7 @@ export class EquipmentController {
   }
 
   @Put('equipment/:id')
+  @Patch('equipment/:id') // ✨ PATCH Requests වලටත් Support සපයා ඇත
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(RoleType.ADMIN, RoleType.STAFF)

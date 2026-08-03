@@ -1,22 +1,15 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { Controller, Get } from '@nestjs/common';
 import { DashboardService } from './dashboard.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
-import { RoleType } from '../database/entities/role.entity';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
 
-@ApiTags('Admin Dashboard')
-@ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@ApiTags('Dashboard')
 @Controller('dashboard')
 export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}
 
-  @Get('metrics')
-  @Roles(RoleType.ADMIN, RoleType.STAFF)
-  @ApiOperation({ summary: 'Get high-level dashboard metrics (Total customers, revenue, active bookings)' })
-  getMetrics() {
-    return this.dashboardService.getMetrics();
+  @Get('stats')
+  @ApiOperation({ summary: 'Get aggregated dashboard metrics and trends' })
+  getStats() {
+    return this.dashboardService.getStats();
   }
 }

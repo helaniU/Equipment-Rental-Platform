@@ -10,6 +10,8 @@ import {
   Calendar, 
   Boxes, 
   CreditCard, 
+  Users,
+  Settings,
   LogOut, 
   User as UserIcon,
   Bell
@@ -28,9 +30,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   // Extracts role whether backend sends string ('ADMIN') or object ({ name: 'ADMIN' })
-const roleName = 
+  const roleName = 
   (typeof user?.role === 'object' ? user?.role?.name : user?.role) || 
-  user?.roleName || 
+  (user as any)?.roleName || 
   'CUSTOMER';
 
   const navItems = [
@@ -39,6 +41,8 @@ const roleName =
     { name: 'Reservations', href: '/dashboard/reservations', icon: Calendar, roles: ['ADMIN', 'STAFF', 'CUSTOMER', 'WAREHOUSE_OPERATOR'] },
     { name: 'Inventory & Stock', href: '/dashboard/inventory', icon: Boxes, roles: ['ADMIN', 'STAFF', 'WAREHOUSE_OPERATOR'] },
     { name: 'Payments', href: '/dashboard/payments', icon: CreditCard, roles: ['ADMIN', 'STAFF', 'CUSTOMER', 'WAREHOUSE_OPERATOR'] },
+    { name: 'Customers', href: '/dashboard/customers', icon: Users, roles: ['ADMIN', 'STAFF'] },
+    { name: 'Settings', href: '/dashboard/settings', icon: Settings, roles: ['ADMIN', 'STAFF', 'CUSTOMER', 'WAREHOUSE_OPERATOR'] },
   ];
 
   return (
