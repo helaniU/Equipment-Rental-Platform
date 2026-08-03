@@ -20,9 +20,25 @@ export class AuthService {
   ) {}
 
   async getAllUsers() {
-    return this.userRepo.find({
-      relations: ['role'], 
+    const users = await this.userRepo.find({
+      relations: ['role', 'reservations'],
       order: { createdAt: 'DESC' },
+    });
+
+    return users.map((user) => {
+      // REJECTED සහ CANCELLED නොවන valid reservations පමණක් filter කර ගැනීම
+      const validReservations = user.reservations
+        ? user.reservations.filter(
+            (r: any) => r.status !== 'REJECTED' && r.status !== 'CANCELLED'
+          )
+        : [];
+
+      return {
+        ...user,
+        _count: {
+          reservations: validReservations.length,
+        },
+      };
     });
   }
 

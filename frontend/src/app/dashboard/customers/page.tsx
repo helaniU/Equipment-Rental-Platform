@@ -13,6 +13,7 @@ interface Customer {
   createdAt: string;
   identityDocumentUrl?: string;
   rentalAgreementUrl?: string;
+  reservations?: any[];
   _count?: {
     reservations?: number;
   };
@@ -125,8 +126,8 @@ export default function CustomersPage() {
 
                     <td className="p-4 text-center">
                       <span className="px-2.5 py-1 bg-purple-100 text-purple-700 font-bold text-xs rounded-full">
-                        {cust._count?.reservations ?? 0} Bookings
-                      </span>
+                        {cust._count?.reservations ?? cust.reservations?.length ?? 0} Bookings
+                        </span>
                     </td>
 
                     <td className="p-4 text-right space-x-2">
