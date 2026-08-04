@@ -20,7 +20,7 @@ export class InventoryService {
     if (!equipment) throw new NotFoundException('Equipment item not found');
 
     // Adjust stock or availability depending on action type
-    if (dto.action === InventoryActionType.MAINTENANCE || dto.action === InventoryActionType.DAMAGE) {
+    if (dto.action === InventoryActionType.MAINTENANCE || dto.action === InventoryActionType.DAMAGE || dto.action === InventoryActionType.RELEASE) {
       if (equipment.stockQuantity < dto.quantity) {
         throw new BadRequestException(`Cannot perform action: quantity exceeds current available stock (${equipment.stockQuantity})`);
       }

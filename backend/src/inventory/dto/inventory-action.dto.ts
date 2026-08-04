@@ -28,6 +28,11 @@ export class RecordInventoryActionDto {
   @IsOptional()
   notes?: string;
 
+  @ApiProperty({ example: 50.00, required: false })
+  @IsNumber()
+  @IsOptional()
+  repairCost?: number;
+
   @ApiProperty({ example: 'reservation-uuid-here', required: false })
   @IsUUID()
   @IsOptional()

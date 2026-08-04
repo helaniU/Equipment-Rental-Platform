@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
-import { CheckCircle, Clock, Receipt, DollarSign, RefreshCw } from 'lucide-react';
+import { CheckCircle, Clock, Receipt, DollarSign, RefreshCw, XCircle } from 'lucide-react';
 
 interface Payment {
   id: string;
@@ -13,7 +13,9 @@ interface Payment {
   reservation?: {
     id: string;
     depositAmount?: number;
-    customer?: { fullName: string; email: string };
+    status?: string;
+    customer?: { fullName?: string; name?: string; email?: string };
+    user?: { fullName?: string; name?: string; email?: string };
   };
 }
 
@@ -39,14 +41,26 @@ export default function PaymentsPage() {
   const handleMarkAsPaid = async (paymentId: string) => {
     try {
       await api.patch(`/payments/${paymentId}/status`, { status: 'PAID' });
-      fetchPayments();
+      setPayments((prevPayments) =>
+        prevPayments.map((p) =>
+          p.id === paymentId ? { ...p, status: 'PAID' } : p
+        )
+      );
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to update payment status');
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
+  const getStatusBadge = (p: Payment) => {
+    // If the payment is marked refunded or if its linked reservation is refunded/refund-requested
+    const effectiveStatus = 
+      p.status === 'REFUNDED' || 
+      p.reservation?.status === 'REFUNDED' || 
+      p.reservation?.status === 'REFUND_REQUESTED' 
+        ? 'REFUNDED' 
+        : p.status;
+
+    switch (effectiveStatus) {
       case 'PAID':
       case 'COMPLETED':
         return (
@@ -66,10 +80,16 @@ export default function PaymentsPage() {
             <RefreshCw className="w-3.5 h-3.5" /> REFUNDED
           </span>
         );
+      case 'FAILED':
+        return (
+          <span className="px-2.5 py-1 bg-red-100 text-red-700 text-xs font-semibold rounded-full flex items-center gap-1 w-fit">
+            <XCircle className="w-3.5 h-3.5" /> FAILED
+          </span>
+        );
       default:
         return (
           <span className="px-2.5 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full w-fit">
-            {status}
+            {effectiveStatus}
           </span>
         );
     }
@@ -77,7 +97,6 @@ export default function PaymentsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
         <h2 className="text-lg font-bold text-gray-800">Checkout & Payment Invoices</h2>
         <p className="text-xs text-gray-500">Track rental fees, paid security deposits, and settlement status</p>
@@ -101,33 +120,36 @@ export default function PaymentsPage() {
                 <th className="p-4">Rental Fee</th>
                 <th className="p-4">Deposit</th>
                 <th className="p-4">Status</th>
-                <th className="p-4 text-right">Action</th>
+                <th className="p-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {payments.map((p) => {
-                const customer = p.reservation?.customer;
+                const clientObj = p.reservation?.customer || p.reservation?.user;
+                const clientName = clientObj?.fullName || clientObj?.name || 'Customer';
+                const clientEmail = clientObj?.email || 'N/A';
                 const deposit = p.reservation?.depositAmount ?? 0;
                 const txnCode = p.transactionId || `TXN-${p.id.slice(0, 8)}`;
+                const isRefunded = p.status === 'REFUNDED' || p.reservation?.status === 'REFUNDED';
 
                 return (
                   <tr key={p.id} className="hover:bg-gray-50 transition">
                     <td className="p-4 font-mono text-xs font-semibold text-gray-800">{txnCode}</td>
                     <td className="p-4">
-                      <div className="font-medium text-gray-900">{customer?.fullName || 'Customer'}</div>
-                      <div className="text-xs text-gray-400">{customer?.email || 'N/A'}</div>
+                      <div className="font-medium text-gray-900">{clientName}</div>
+                      <div className="text-xs text-gray-400">{clientEmail}</div>
                     </td>
                     <td className="p-4 text-xs text-gray-500">
                       {new Date(p.createdAt).toLocaleDateString()}
                     </td>
                     <td className="p-4 font-bold text-gray-900">${Number(p.amount || 0).toFixed(2)}</td>
                     <td className="p-4 font-semibold text-blue-600">${Number(deposit).toFixed(2)}</td>
-                    <td className="p-4">{getStatusBadge(p.status)}</td>
+                    <td className="p-4">{getStatusBadge(p)}</td>
                     <td className="p-4 text-right">
-                      {p.status === 'PENDING' && (
+                      {p.status === 'PENDING' && !isRefunded && (
                         <button
                           onClick={() => handleMarkAsPaid(p.id)}
-                          className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-lg transition inline-flex items-center gap-1"
+                          className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-lg transition inline-flex items-center gap-1 ml-auto"
                         >
                           <DollarSign className="w-3.5 h-3.5" /> Process Payment
                         </button>

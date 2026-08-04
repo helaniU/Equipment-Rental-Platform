@@ -16,7 +16,7 @@ export class PaymentsService {
   async processPayment(user: User, dto: ProcessPaymentDto) {
     const reservation = await this.reservationRepo.findOne({
       where: { id: dto.reservationId },
-      relations: ['user'],
+      relations: ['user', 'items', 'items.equipment'],
     });
 
     if (!reservation) throw new NotFoundException('Reservation not found');
@@ -67,6 +67,18 @@ export class PaymentsService {
     payment.status = PaymentStatus.REFUNDED;
     return this.paymentRepo.save(payment);
   }
+
+  async processRefund(reservationId: string) {
+  // 1. Update reservation status
+  await this.reservationRepo.update(reservationId, { status: 'REFUNDED' as ReservationStatus });
+
+  // 2. Find and update the linked payment record
+  const payment = await this.paymentRepo.findOne({ where: { reservation: { id: reservationId } } });
+  if (payment) {
+    payment.status = 'REFUNDED' as any; // or 'REFUNDED' matching your PaymentStatus enum
+    await this.paymentRepo.save(payment);
+  }
+}
 
   async findAll(user: User) {
     const roleName = typeof user.role === 'object' ? (user.role as any)?.name : user.role;

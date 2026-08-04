@@ -21,6 +21,8 @@ export enum ReservationStatus {
   ACTIVE = 'ACTIVE',
   RETURNED = 'RETURNED',
   CANCELLED = 'CANCELLED',
+  REFUND_REQUESTED = 'REFUND_REQUESTED',
+  REFUNDED = 'REFUNDED',
 }
 
 @Entity('reservations')

@@ -43,7 +43,6 @@ export class ReservationsController {
 
   @Put(':id/cancel')
   @Roles(RoleType.CUSTOMER, RoleType.ADMIN, RoleType.STAFF)
-  @ApiOperation({ summary: 'Cancel a pending reservation' })
   cancel(@Param('id') id: string, @Request() req: any) {
     return this.reservationsService.cancel(id, req.user);
   }

@@ -1,12 +1,17 @@
 import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { Reservation, ReservationStatus } from '../database/entities/reservation.entity';
 import { ReservationItem } from '../database/entities/reservation-item.entity';
 import { Equipment } from '../database/entities/equipment.entity';
 import { User } from '../database/entities/user.entity';
+import { Payment, PaymentStatus } from '../database/entities/payment.entity';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { UpdateReservationStatusDto } from './dto/update-reservation-status.dto';
+import { Cron, CronExpression } from '@nestjs/schedule';
+import { Between } from 'typeorm';
 
 @Injectable()
 export class ReservationsService {
@@ -14,7 +19,40 @@ export class ReservationsService {
     @InjectRepository(Reservation) private reservationRepo: Repository<Reservation>,
     @InjectRepository(ReservationItem) private itemRepo: Repository<ReservationItem>,
     @InjectRepository(Equipment) private equipmentRepo: Repository<Equipment>,
+    @InjectRepository(Payment) private paymentRepo: Repository<Payment>,
+    @InjectQueue('notifications') private readonly notificationQueue: Queue,
   ) {}
+
+  @Cron(CronExpression.EVERY_DAY_AT_1AM)
+  async handleRentalReminders() {
+    console.log('Running scheduled job: Checking for upcoming returns and overdue reservations...');
+
+    const today = new Date();
+    const tomorrow = new Date();
+    tomorrow.setDate(today.getDate() + 1);
+    
+    const upcomingReservations = await this.reservationRepo.find({
+      where: {
+        status: ReservationStatus.ACTIVE,
+        returnDate: Between(
+          new Date(tomorrow.setHours(0, 0, 0, 0)),
+          new Date(tomorrow.setHours(23, 59, 59, 999))
+        ),
+      },
+      relations: ['user'],
+    });
+
+    for (const res of upcomingReservations) {
+      if (res.user?.email) {
+        await this.notificationQueue.add('UPCOMING_RETURN_REMINDER', {
+          reservationId: res.id,
+          email: res.user.email,
+          returnDate: res.returnDate,
+        });
+        console.log(`Queued upcoming return reminder for: ${res.user.email}`);
+      }
+    }
+  }
 
   async create(user: User, dto: CreateReservationDto) {
     const pickup = new Date(dto.pickupDate);
@@ -55,7 +93,7 @@ export class ReservationsService {
     }
 
     const reservation = this.reservationRepo.create({
-      user, // Use 'user' instead of 'customer'
+      user,
       pickupDate: pickup,
       returnDate: returnDt,
       totalPrice,
@@ -71,18 +109,32 @@ export class ReservationsService {
   async findAll(user: User) {
     const roleName = typeof user.role === 'object' ? (user.role as any)?.name : user.role;
 
+    let reservations = [];
     if (['ADMIN', 'STAFF', 'WAREHOUSE_OPERATOR'].includes(roleName)) {
-      return this.reservationRepo.find({ 
+      reservations = await this.reservationRepo.find({ 
         relations: ['user', 'items', 'items.equipment'],
+        order: { createdAt: 'DESC' }
+      });
+    } else {
+      reservations = await this.reservationRepo.find({
+        where: { user: { id: user.id } },
+        relations: ['items', 'items.equipment'],
         order: { createdAt: 'DESC' }
       });
     }
 
-    return this.reservationRepo.find({
-      where: { user: { id: user.id } }, // Use 'user' instead of 'customer'
-      relations: ['items', 'items.equipment'],
-      order: { createdAt: 'DESC' }
-    });
+    const enrichedReservations = await Promise.all(
+      reservations.map(async (res) => {
+        const payment = await this.paymentRepo.findOne({ where: { reservation: { id: res.id } } });
+        return {
+          ...res,
+          isPaid: payment ? payment.status === PaymentStatus.PAID : false,
+          paymentStatus: payment ? payment.status : 'PENDING',
+        };
+      })
+    );
+
+    return enrichedReservations;
   }
 
   async findOne(id: string, user: User) {
@@ -98,13 +150,18 @@ export class ReservationsService {
       throw new ForbiddenException('Access denied');
     }
 
-    return res;
+    const payment = await this.paymentRepo.findOne({ where: { reservation: { id: res.id } } });
+    return {
+      ...res,
+      isPaid: payment ? payment.status === PaymentStatus.PAID : false,
+      paymentStatus: payment ? payment.status : 'PENDING',
+    };
   }
 
   async updateStatus(id: string, dto: UpdateReservationStatusDto) {
     const res = await this.reservationRepo.findOne({
       where: { id },
-      relations: ['items', 'items.equipment'],
+      relations: ['items', 'items.equipment', 'user'],
     });
 
     if (!res) throw new NotFoundException('Reservation not found');
@@ -140,7 +197,19 @@ export class ReservationsService {
       res.rejectionReason = dto.rejectionReason;
     }
 
-    return this.reservationRepo.save(res);
+    const updatedReservation = await this.reservationRepo.save(res);
+
+    if ([ReservationStatus.APPROVED, ReservationStatus.REJECTED, ReservationStatus.REFUNDED].includes(newStatus)) {
+      await this.notificationQueue.add('RENTAL_CONFIRMATION', {
+        reservationId: updatedReservation.id,
+        email: updatedReservation.user?.email,
+        status: newStatus,
+        reason: dto.rejectionReason || '',
+        totalPrice: updatedReservation.totalPrice,
+      });
+    }
+
+    return updatedReservation;
   }
 
   async cancel(id: string, user: User) {
@@ -156,8 +225,17 @@ export class ReservationsService {
       throw new ForbiddenException('You can only cancel your own reservations');
     }
 
-    if (res.status !== ReservationStatus.PENDING) {
-      throw new BadRequestException('Only PENDING reservations can be cancelled');
+    const payment = await this.paymentRepo.findOne({ where: { reservation: { id: res.id } } });
+    const isPaid = payment && payment.status === PaymentStatus.PAID;
+
+    if (isPaid) {
+      res.status = ReservationStatus.REFUND_REQUESTED;
+      await this.reservationRepo.save(res);
+      return { message: 'Refund requested successfully for the paid reservation.' };
+    }
+
+    if (res.status !== ReservationStatus.PENDING && res.status !== ReservationStatus.APPROVED) {
+      throw new BadRequestException('Reservation cannot be cancelled at this stage');
     }
 
     res.status = ReservationStatus.CANCELLED;

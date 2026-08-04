@@ -11,13 +11,19 @@ import { InventoryModule } from './inventory/inventory.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { ScheduleModule } from '@nestjs/schedule';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
+    ScheduleModule.forRoot(),
     ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' }),
     ServeStaticModule.forRoot({
-      rootPath: join(__dirname, '..', 'uploads'),
+      rootPath: join(process.cwd(), 'uploads'),
       serveRoot: '/uploads',
+      serveStaticOptions: {
+        fallthrough: false, // Prevents crashing if a specific file or index.html is missing
+      },
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
@@ -42,6 +48,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     DashboardModule,
     UploadsModule,
     NotificationsModule,
+    UsersModule,
   ],
 })
 export class AppModule {}
