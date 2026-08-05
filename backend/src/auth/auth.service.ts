@@ -9,6 +9,7 @@ import { Role, RoleType } from '../database/entities/role.entity';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto, ResetPasswordDto } from './dto/forgot-password.dto';
+import { MailService } from './mail/mail.service';
 
 @Injectable()
 export class AuthService {
@@ -17,6 +18,7 @@ export class AuthService {
     @InjectRepository(Role) private roleRepo: Repository<Role>,
     private jwtService: JwtService,
     private configService: ConfigService,
+    private readonly mailService: MailService,
   ) {}
 
   async getAllUsers() {
@@ -103,6 +105,7 @@ export class AuthService {
   async forgotPassword(dto: ForgotPasswordDto) {
     const user = await this.userRepo.findOne({ where: { email: dto.email } });
     if (!user) {
+      // Return a generic success message to prevent user enumeration security risks
       return { message: 'If an account exists, a password reset token has been sent.' };
     }
 
@@ -111,7 +114,10 @@ export class AuthService {
       { secret: process.env.JWT_SECRET || 'secret', expiresIn: '15m' },
     );
 
-    return { message: 'Password reset token generated', resetToken };
+    // Send the token via your MailService
+    await this.mailService.sendPasswordResetEmail(user.email, resetToken);
+
+    return { message: 'Password reset instructions sent to your email.' };
   }
 
   async resetPassword(dto: ResetPasswordDto) {

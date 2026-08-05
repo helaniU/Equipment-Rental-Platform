@@ -14,17 +14,16 @@ import { RoleType } from '../database/entities/role.entity';
 export class InventoryController {
   constructor(private readonly inventoryService: InventoryService) {}
 
-  // 💡 ['logs', 'action'] දෙකම Support කරන ලෙස වෙනස් කළා
   @Post(['logs', 'action'])
-  @Roles(RoleType.WAREHOUSE_OPERATOR, RoleType.ADMIN, RoleType.STAFF)
-  @ApiOperation({ summary: 'Record inventory event (Release, Receive, Damage, Maintenance)' })
+  @Roles(RoleType.WAREHOUSE_OPERATOR)
+  @ApiOperation({ summary: 'Record inventory event (Warehouse Operator only)' })
   recordAction(@Request() req: any, @Body() dto: RecordInventoryActionDto) {
     return this.inventoryService.recordAction(req.user, dto);
   }
 
   @Get('logs')
   @Roles(RoleType.WAREHOUSE_OPERATOR, RoleType.ADMIN, RoleType.STAFF)
-  @ApiOperation({ summary: 'Get all inventory logs / audit history' })
+  @ApiOperation({ summary: 'Get all inventory logs / audit history (Warehouse, Admin, Staff)' })
   @ApiQuery({ name: 'equipmentId', required: false })
   getLogs(@Query('equipmentId') equipmentId?: string) {
     return this.inventoryService.findAllLogs(equipmentId);

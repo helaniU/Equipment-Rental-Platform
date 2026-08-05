@@ -39,13 +39,13 @@ export class EquipmentController {
     return this.equipmentService.findOneEquipment(id);
   }
 
-  // --- ADMIN & STAFF ONLY ENDPOINTS ---
+  // --- WAREHOUSE OPERATOR ONLY ENDPOINTS ---
 
   @Post('categories')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(RoleType.ADMIN, RoleType.STAFF)
-  @ApiOperation({ summary: 'Create new equipment category (Admin/Staff only)' })
+  @Roles(RoleType.WAREHOUSE_OPERATOR)
+  @ApiOperation({ summary: 'Create new equipment category (Warehouse Operator only)' })
   createCategory(@Body() dto: CreateCategoryDto) {
     return this.equipmentService.createCategory(dto);
   }
@@ -54,8 +54,8 @@ export class EquipmentController {
   @Patch('categories/:id')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(RoleType.ADMIN, RoleType.STAFF)
-  @ApiOperation({ summary: 'Update equipment category (Admin/Staff only)' })
+  @Roles(RoleType.WAREHOUSE_OPERATOR)
+  @ApiOperation({ summary: 'Update equipment category (Warehouse Operator only)' })
   updateCategory(@Param('id') id: string, @Body() dto: CreateCategoryDto) {
     return this.equipmentService.updateCategory(id, dto);
   }
@@ -63,8 +63,8 @@ export class EquipmentController {
   @Delete('categories/:id')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(RoleType.ADMIN, RoleType.STAFF)
-  @ApiOperation({ summary: 'Delete category (Admin/Staff only)' })
+  @Roles(RoleType.WAREHOUSE_OPERATOR)
+  @ApiOperation({ summary: 'Delete category (Warehouse Operator only)' })
   deleteCategory(@Param('id') id: string) {
     return this.equipmentService.deleteCategory(id);
   }
@@ -72,18 +72,18 @@ export class EquipmentController {
   @Post('equipment')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(RoleType.ADMIN, RoleType.STAFF)
-  @ApiOperation({ summary: 'Create new equipment item (Admin/Staff only)' })
+  @Roles(RoleType.WAREHOUSE_OPERATOR)
+  @ApiOperation({ summary: 'Create new equipment item (Warehouse Operator only)' })
   createEquipment(@Body() dto: CreateEquipmentDto) {
     return this.equipmentService.createEquipment(dto);
   }
 
   @Put('equipment/:id')
-  @Patch('equipment/:id') // ✨ PATCH Requests වලටත් Support සපයා ඇත
+  @Patch('equipment/:id')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(RoleType.ADMIN, RoleType.STAFF)
-  @ApiOperation({ summary: 'Update equipment item (Admin/Staff only)' })
+  @Roles(RoleType.WAREHOUSE_OPERATOR)
+  @ApiOperation({ summary: 'Update equipment item (Warehouse Operator only)' })
   updateEquipment(@Param('id') id: string, @Body() dto: UpdateEquipmentDto) {
     return this.equipmentService.updateEquipment(id, dto);
   }
@@ -91,8 +91,8 @@ export class EquipmentController {
   @Delete('equipment/:id')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(RoleType.ADMIN, RoleType.STAFF)
-  @ApiOperation({ summary: 'Delete equipment item (Admin/Staff only)' })
+  @Roles(RoleType.WAREHOUSE_OPERATOR)
+  @ApiOperation({ summary: 'Delete equipment item (Warehouse Operator only)' })
   deleteEquipment(@Param('id') id: string) {
     return this.equipmentService.deleteEquipment(id);
   }

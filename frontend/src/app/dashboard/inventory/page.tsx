@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import { useAuth } from '@/context/AuthContext';
 import { Boxes, RefreshCw, AlertTriangle, CheckCircle, Search, Loader2, History } from 'lucide-react';
 
 interface InventoryItem {
@@ -26,6 +27,7 @@ interface InventoryLog {
 }
 
 export default function InventoryPage() {
+  const { user } = useAuth();
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [logs, setLogs] = useState<InventoryLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,6 +38,9 @@ export default function InventoryPage() {
   const [quantity, setQuantity] = useState('1');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  const userRole = typeof user?.role === 'object' ? user?.role?.name : user?.role;
+  const canRecordActions = userRole === 'WAREHOUSE_OPERATOR';
 
   const normalizeInventoryData = (data: any[]): InventoryItem[] => {
     if (!Array.isArray(data)) return [];
@@ -169,8 +174,8 @@ export default function InventoryPage() {
                   <th className="p-4">Warehouse Location</th>
                   <th className="p-4 text-center">Total Stock</th>
                   <th className="p-4 text-center">Available</th>
-                  <th className="p-4 text-center">Maintenance</th>
-                  <th className="p-4 text-right">Action</th>
+                  {/* <th className="p-4 text-center">Maintenance</th> */}
+                  {canRecordActions && <th className="p-4 text-right">Action</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -190,7 +195,7 @@ export default function InventoryPage() {
                         <CheckCircle className="w-3 h-3" /> {item.availableQuantity}
                       </span>
                     </td>
-                    <td className="p-4 text-center">
+                    {/* <td className="p-4 text-center">
                       {item.maintenanceQuantity > 0 ? (
                         <span className="px-2.5 py-1 bg-amber-50 text-amber-700 font-semibold text-xs rounded-md inline-flex items-center gap-1">
                           <AlertTriangle className="w-3 h-3" /> {item.maintenanceQuantity}
@@ -198,19 +203,21 @@ export default function InventoryPage() {
                       ) : (
                         <span className="text-xs text-gray-400">0</span>
                       )}
-                    </td>
-                    <td className="p-4 text-right">
-                      <button
-                        onClick={() => {
-                          setSelectedItem(item);
-                          setQuantity('1');
-                          setNotes('');
-                        }}
-                        className="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-medium rounded-lg transition inline-flex items-center gap-1"
-                      >
-                        <RefreshCw className="w-3.5 h-3.5" /> Record Action
-                      </button>
-                    </td>
+                    </td> */}
+                    {canRecordActions && (
+                      <td className="p-4 text-right">
+                        <button
+                          onClick={() => {
+                            setSelectedItem(item);
+                            setQuantity('1');
+                            setNotes('');
+                          }}
+                          className="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-medium rounded-lg transition inline-flex items-center gap-1"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" /> Record Action
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -265,7 +272,7 @@ export default function InventoryPage() {
       )}
 
       {/* Stock Action Modal */}
-      {selectedItem && (
+      {canRecordActions && selectedItem && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl max-w-sm w-full p-6 space-y-4">
             <h3 className="text-lg font-bold text-gray-900">Record Stock Action</h3>

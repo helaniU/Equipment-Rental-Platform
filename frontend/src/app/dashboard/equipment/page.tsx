@@ -60,7 +60,7 @@ export default function EquipmentPage() {
   });
 
   const userRole = typeof user?.role === 'object' ? user?.role?.name : user?.role;
-  const isStaffOrAdmin = userRole === 'ADMIN' || userRole === 'STAFF';
+  const isWarehouseOperator = userRole === 'WAREHOUSE_OPERATOR';
 
   const extractArray = (res: any): any[] => {
     if (Array.isArray(res)) return res;
@@ -255,7 +255,7 @@ export default function EquipmentPage() {
           </div>
         </div>
 
-        {isStaffOrAdmin && (
+        {isWarehouseOperator && (
           <div className="flex items-center gap-2">
             <button
               onClick={() => setIsCategoryModalOpen(true)}
@@ -330,7 +330,7 @@ export default function EquipmentPage() {
                   </div>
                 </div>
 
-                {isStaffOrAdmin && (
+                {isWarehouseOperator && (
                   <div className="flex gap-2 justify-end border-t pt-2">
                     <button
                       onClick={() => handleOpenEditModal(item)}

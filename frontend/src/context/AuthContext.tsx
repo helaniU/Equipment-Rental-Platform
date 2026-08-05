@@ -17,13 +17,14 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   login: (email: string, password: string) => Promise<void>;
+  register: (fullName: string, email: string, password: string, phone?: string) => Promise<void>;
+  forgotPassword: (email: string) => Promise<any>;
   logout: () => void;
   isLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Helper function to decode JWT token payload without external libraries
 const decodeJwt = (token: string) => {
   try {
     const base64Url = token.split('.')[1];
@@ -64,7 +65,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           localStorage.removeItem('user');
         }
       } else {
-        // Fallback: Extract user info directly from decoded JWT
         const decoded = decodeJwt(storedToken);
         if (decoded) {
           const userObj: User = {
@@ -83,20 +83,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const login = async (email: string, password: string) => {
     try {
       const response = await api.post('/auth/login', { email, password });
-
       const { accessToken, refreshToken } = response.data;
 
       if (!accessToken) {
         throw new Error('No access token received');
       }
 
-      // 1. Save tokens to localStorage
       localStorage.setItem('accessToken', accessToken);
       if (refreshToken) {
         localStorage.setItem('refreshToken', refreshToken);
       }
 
-      // 2. Extract user info from decoded JWT token
       const decoded = decodeJwt(accessToken);
       const userObj: User = {
         id: decoded?.sub || decoded?.id || '',
@@ -105,16 +102,34 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         role: typeof decoded?.role === 'string' ? { name: decoded.role } : decoded?.role || { name: 'USER' },
       };
 
-      // 3. Save user info to state and localStorage
       localStorage.setItem('user', JSON.stringify(userObj));
       setToken(accessToken);
       setUser(userObj);
 
-      // 4. Redirect to dashboard
       window.location.href = '/dashboard';
     } catch (error) {
       console.error('Login failed:', error);
-      throw error; // Re-throw error so the UI form can display error messages
+      throw error;
+    }
+  };
+
+  const register = async (fullName: string, email: string, password: string, phone?: string) => {
+    try {
+      await api.post('/auth/register', { fullName, email, password, phone });
+      await login(email, password);
+    } catch (error) {
+      console.error('Registration failed:', error);
+      throw error;
+    }
+  };
+
+  const forgotPassword = async (email: string) => {
+    try {
+      const response = await api.post('/auth/forgot-password', { email });
+      return response.data;
+    } catch (error) {
+      console.error('Password reset request failed:', error);
+      throw error;
     }
   };
 
@@ -128,7 +143,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, token, login, register, forgotPassword, logout, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
-import { Calendar, CheckCircle2, XCircle, Clock, Plus, CreditCard, AlertTriangle, X, RefreshCw } from 'lucide-react';
+import { Calendar, CheckCircle2, XCircle, Clock, Plus, CreditCard, AlertTriangle, X, RefreshCw, ShieldCheck } from 'lucide-react';
 
 interface ReservationItem {
   id: string;
@@ -16,7 +16,7 @@ interface Reservation {
   pickupDate: string;
   returnDate: string;
   totalPrice: number;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'ACTIVE' | 'RETURNED' | 'CANCELLED' | 'REFUND_REQUESTED' | 'REFUNDED';
+  status: string;
   rejectionReason?: string;
   items?: ReservationItem[];
   customer?: { fullName?: string; name?: string; email?: string };
@@ -40,9 +40,31 @@ export default function ReservationsPage() {
     returnDate: '',
   });
 
-  // Custom Payment Message Box Modal State
+  const [currentTime, setCurrentTime] = useState('10 : 03');
+
+  useEffect(() => {
+    const updateClock = () => {
+      const now = new Date();
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      setCurrentTime(`${hours} : ${minutes}`);
+    };
+
+    updateClock();
+    const timer = setInterval(updateClock, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Custom Payment Modal State & Form Fields
   const [selectedPaymentReservation, setSelectedPaymentReservation] = useState<Reservation | null>(null);
   const [isPaying, setIsPaying] = useState(false);
+  const [paymentForm, setPaymentForm] = useState({
+    cardNumber: '4342 •••• •••• 3446',
+    cvv: '446',
+    expiryMonth: '10',
+    expiryYear: '24',
+    password: '••••••••',
+  });
 
   // Custom Confirmation Modal State for Cancellation / Refund Request
   const [cancelReservationTarget, setCancelReservationTarget] = useState<Reservation | null>(null);
@@ -96,7 +118,7 @@ export default function ReservationsPage() {
 
     try {
       await api.patch(`/reservations/${id}/status`, { status });
-      patchReservationLocally(id, { status: status as Reservation['status'] });
+      patchReservationLocally(id, { status });
       fetchReservations();
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to update reservation status');
@@ -140,7 +162,8 @@ export default function ReservationsPage() {
     }
   };
 
-  const confirmPayment = async () => {
+  const confirmPayment = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!selectedPaymentReservation) return;
 
     setIsPaying(true);
@@ -149,7 +172,7 @@ export default function ReservationsPage() {
         reservationId: selectedPaymentReservation.id,
         amount: Number(selectedPaymentReservation.totalPrice),
         type: 'RENTAL_FEE',
-        paymentMethod: 'MOCK_CARD'
+        paymentMethod: 'MOCK_CARD',
       });
 
       patchReservationLocally(selectedPaymentReservation.id, { isPaid: true, paymentStatus: 'PAID' });
@@ -195,7 +218,7 @@ export default function ReservationsPage() {
       case 'REFUND_REQUESTED':
         return <span className="px-2.5 py-1 bg-purple-100 text-purple-700 text-xs font-semibold rounded-full flex items-center gap-1 w-fit"><RefreshCw className="w-3.5 h-3.5" /> REFUND REQUESTED</span>;
       case 'REFUNDED':
-        return <span className="px-2.5 py-1 bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-full flex items-center gap-1 w-fit"><CheckCircle2 className="w-3.5 h-3.5" /> REFUNDED</span>;
+        return <span className="px-2.5 py-1 bg-violet-100 text-violet-800 text-xs font-semibold rounded-full flex items-center gap-1 w-fit"><CheckCircle2 className="w-3.5 h-3.5" /> REFUNDED</span>;
       case 'REJECTED':
       case 'CANCELLED':
         return (
@@ -268,6 +291,8 @@ export default function ReservationsPage() {
                 const clientName = clientObj?.fullName || clientObj?.name || 'Customer';
                 const clientEmail = clientObj?.email || '';
 
+                const isPaidStatus = res.isPaid || res.paymentStatus === 'PAID';
+
                 return (
                   <tr key={res.id} className="hover:bg-gray-50 transition">
                     <td className="p-4 font-semibold text-gray-900">{equipmentSummary}</td>
@@ -279,7 +304,16 @@ export default function ReservationsPage() {
                       {new Date(res.pickupDate).toLocaleDateString()} — {new Date(res.returnDate).toLocaleDateString()}
                     </td>
                     <td className="p-4 font-bold text-blue-600">${res.totalPrice}</td>
-                    <td className="p-4">{getStatusBadge(res)}</td>
+                    <td className="p-4">
+                      <div className="flex flex-col gap-1.5">
+                        {getStatusBadge(res)}
+                        {isPaidStatus && (
+                          <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 text-xs font-semibold rounded-full flex items-center gap-1 w-fit shadow-xs">
+                            <ShieldCheck className="w-3.5 h-3.5" /> PAID
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     
                     <td className="p-4 text-right space-x-2">
                       {isStaffOrAdmin && res.status === 'PENDING' && (
@@ -308,7 +342,7 @@ export default function ReservationsPage() {
                         </button>
                       )}
 
-                      {!isStaffOrAdmin && res.status === 'APPROVED' && !res.isPaid && (
+                      {!isStaffOrAdmin && res.status === 'APPROVED' && !isPaidStatus && (
                         <button
                           onClick={() => setSelectedPaymentReservation(res)}
                           className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition inline-flex items-center gap-1.5 shadow-sm"
@@ -324,7 +358,7 @@ export default function ReservationsPage() {
                           className="px-3 py-1.5 bg-gray-100 text-red-600 text-xs font-semibold rounded-lg hover:bg-red-50 border border-gray-200 transition inline-flex items-center gap-1"
                         >
                           <X className="w-3.5 h-3.5" />
-                          {res.isPaid ? 'Request Refund' : 'Cancel'}
+                          {isPaidStatus ? 'Request Refund' : 'Cancel'}
                         </button>
                       )}
                     </td>
@@ -336,6 +370,7 @@ export default function ReservationsPage() {
         </div>
       )}
 
+      {/* Cancel / Refund Modal */}
       {cancelReservationTarget && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl max-w-sm w-full p-6 space-y-4 shadow-xl">
@@ -375,6 +410,7 @@ export default function ReservationsPage() {
         </div>
       )}
 
+      {/* Rejection Reason Modal */}
       {rejectReservationId && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl max-w-sm w-full p-6 space-y-4 shadow-xl">
@@ -422,73 +458,168 @@ export default function ReservationsPage() {
         </div>
       )}
 
+      {/* Mock Payment Gateway Modal matching the design */}
       {selectedPaymentReservation && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-sm w-full p-6 space-y-4 shadow-xl">
-            <div className="text-center">
-              <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-3">
-                <CreditCard className="w-6 h-6" />
-              </div>
-              <h3 className="text-lg font-bold text-gray-900">Payment Confirmation</h3>
-              <p className="text-xs text-gray-500 mt-1">
-                Confirm payment for your equipment reservation
-              </p>
-            </div>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-8 shadow-2xl relative">
+            <button
+              onClick={() => setSelectedPaymentReservation(null)}
+              className="absolute top-5 right-5 text-gray-400 hover:text-gray-600 p-1"
+            >
+              <X className="w-5 h-5" />
+            </button>
 
-            <div className="space-y-2 bg-gray-50 p-3 rounded-lg border border-gray-200 text-xs text-gray-700">
-              <div className="flex justify-between border-b pb-1">
-                <span className="text-gray-500">Equipment:</span>
-                <span className="font-semibold text-gray-900">
-                  {selectedPaymentReservation.items?.map((i) => {
-                    return (
-                      i.equipment?.name ||
-                      equipmentList.find((eq) => eq.id === (i.equipment?.id ?? (i as any).equipmentId ?? (i as any).equipment))?.name ||
-                      'Gear'
-                    );
-                  }).join(', ') || 'Gear'}
-                </span>
+            <div className="flex justify-between items-center mb-6">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">
+                  ⚡
+                </div>
+                <span className="font-bold text-gray-900 text-lg">Meiranpay</span>
               </div>
-              <div className="flex justify-between border-b pb-1">
-                <span className="text-gray-500">Customer:</span>
-                <span className="font-medium text-gray-900">
-                  {selectedPaymentReservation.customer?.fullName || 
-                   selectedPaymentReservation.customer?.name || 
-                   selectedPaymentReservation.user?.fullName || 
-                   selectedPaymentReservation.user?.name || 
-                   selectedPaymentReservation.user?.email || 
-                   user?.fullName || 
-                   user?.email || 
-                   'Customer'}
-                </span>
-              </div>
-              <div className="flex justify-between pt-1 text-sm font-bold">
-                <span className="text-gray-700">Total Amount:</span>
-                <span className="text-blue-600">${selectedPaymentReservation.totalPrice}</span>
+              <div className="bg-gray-900 text-white text-xs font-mono px-3 py-1.5 rounded-lg flex items-center gap-1.5 tracking-wider">
+                <Clock className="w-3.5 h-3.5 text-blue-400" />
+                <span>{currentTime}</span>
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setSelectedPaymentReservation(null)}
-                disabled={isPaying}
-                className="px-4 py-2 border rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50 transition"
-              >
-                Close
-              </button>
-              <button
-                type="button"
-                onClick={confirmPayment}
-                disabled={isPaying}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 transition flex items-center gap-1"
-              >
-                {isPaying ? 'Processing...' : 'Confirm & Pay'}
-              </button>
-            </div>
+            <form onSubmit={confirmPayment} className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+              <div className="md:col-span-7 space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-800 mb-1">Card Number</label>
+                  <p className="text-[11px] text-gray-400 mb-1.5">Enter the 16-digit card number on the card</p>
+                  <div className="relative flex items-center border rounded-xl px-3 py-2.5 bg-white border-gray-200 focus-within:border-blue-600">
+                    <span className="mr-2 text-xl">💳</span>
+                    <input
+                      type="text"
+                      value={paymentForm.cardNumber}
+                      onChange={(e) => setPaymentForm({ ...paymentForm, cardNumber: e.target.value })}
+                      className="w-full text-xs font-mono text-gray-800 focus:outline-none bg-transparent"
+                      required
+                    />
+                    <CheckCircle2 className="w-4 h-4 text-blue-600 ml-2" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-800 mb-1">CVV Number</label>
+                    <p className="text-[11px] text-gray-400 mb-1.5">3 or 4 digits</p>
+                    <input
+                      type="password"
+                      maxLength={4}
+                      value={paymentForm.cvv}
+                      onChange={(e) => setPaymentForm({ ...paymentForm, cvv: e.target.value })}
+                      className="w-full border rounded-xl p-2.5 text-xs text-center font-mono border-gray-200 focus:outline-none focus:border-blue-600"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-800 mb-1">Expiry Date</label>
+                    <p className="text-[11px] text-gray-400 mb-1.5">MM / YY</p>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        maxLength={2}
+                        value={paymentForm.expiryMonth}
+                        onChange={(e) => setPaymentForm({ ...paymentForm, expiryMonth: e.target.value })}
+                        className="w-1/2 border rounded-xl p-2.5 text-xs text-center font-mono border-gray-200 focus:outline-none focus:border-blue-600"
+                        required
+                      />
+                      <input
+                        type="text"
+                        maxLength={2}
+                        value={paymentForm.expiryYear}
+                        onChange={(e) => setPaymentForm({ ...paymentForm, expiryYear: e.target.value })}
+                        className="w-1/2 border rounded-xl p-2.5 text-xs text-center font-mono border-gray-200 focus:outline-none focus:border-blue-600"
+                        required
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-800 mb-1">Password</label>
+                  <p className="text-[11px] text-gray-400 mb-1.5">Enter your Dynamic password</p>
+                  <input
+                    type="password"
+                    value={paymentForm.password}
+                    onChange={(e) => setPaymentForm({ ...paymentForm, password: e.target.value })}
+                    className="w-full border rounded-xl p-2.5 text-xs font-mono border-gray-200 focus:outline-none focus:border-blue-600"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Receipt Summary Card */}
+              <div className="md:col-span-5 bg-gray-50 border border-gray-200 p-5 rounded-2xl space-y-4 shadow-xs">
+                <div className="bg-gradient-to-tr from-gray-900 to-blue-900 text-white p-4 rounded-xl shadow-md space-y-4">
+                  <div className="flex justify-between items-center text-xs opacity-80">
+                    <span>💳 Chip</span>
+                    <span>Mastercard</span>
+                  </div>
+                  <div>
+                    <p className="text-[10px] opacity-70">Cardholder Name</p>
+                    <p className="text-xs font-semibold tracking-wide">
+                      {selectedPaymentReservation.customer?.fullName || 
+                       selectedPaymentReservation.customer?.name || 
+                       selectedPaymentReservation.user?.fullName || 
+                       selectedPaymentReservation.user?.name || 
+                       user?.fullName || 'Customer'}
+                    </p>
+                  </div>
+                  <div className="flex justify-between items-end">
+                    <span className="font-mono text-xs tracking-wider">•••• 3446</span>
+                    <span className="font-mono text-xs">09/24</span>
+                  </div>
+                </div>
+
+                <div className="space-y-2 text-xs text-gray-600 border-t border-dashed border-gray-300 pt-3">
+                  <div className="flex justify-between">
+                    <span>Company</span>
+                    <span className="font-semibold text-gray-800">Equipment Rental Platform</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Order Number</span>
+                    <span className="font-mono text-gray-800">#{selectedPaymentReservation.id.slice(0, 8)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Product</span>
+                    <span className="font-semibold text-gray-800 truncate max-w-[120px]">
+                      {selectedPaymentReservation.items?.map((i) => i.equipment?.name).join(', ') || 'Gear'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>VAT (20%)</span>
+                    <span className="text-gray-800">${(Number(selectedPaymentReservation.totalPrice) * 0.2).toFixed(2)}</span>
+                  </div>
+                </div>
+
+                <div className="border-t border-dashed border-gray-300 pt-3 flex justify-between items-center">
+                  <div>
+                    <p className="text-[10px] text-gray-400">You have to Pay</p>
+                    <p className="text-lg font-bold text-blue-600">${selectedPaymentReservation.totalPrice} <span className="text-[10px] text-gray-500 font-normal">USD</span></p>
+                  </div>
+                  <div className="bg-blue-50 text-blue-600 p-2 rounded-lg">
+                    <CreditCard className="w-4 h-4" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="md:col-span-12 pt-2">
+                <button
+                  type="submit"
+                  disabled={isPaying}
+                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-sm shadow-lg transition flex items-center justify-center gap-2"
+                >
+                  {isPaying ? 'Processing Payment...' : 'Pay Now'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
 
+      {/* New Reservation Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl max-w-md w-full p-6 space-y-4">
