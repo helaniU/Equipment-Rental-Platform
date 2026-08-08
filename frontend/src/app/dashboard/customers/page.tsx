@@ -52,9 +52,15 @@ export default function CustomersPage() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center flex-wrap gap-4">
-        <div>
-          <h2 className="text-lg font-bold text-gray-800">Customer Management</h2>
-          <p className="text-xs text-gray-500">View registered clients, activity, and uploaded verification documents</p>
+        <div className="flex items-center gap-4">
+          <div className="w-1 h-10 rounded-full bg-gradient-to-b from-blue-600 to-indigo-500" />
+          <div>
+            <h2 className="text-xl font-extrabold text-gray-900 tracking-tight">Customer Management</h2>
+            <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+              View registered clients, activity, and uploaded verification documents
+            </p>
+          </div>
         </div>
 
         {/* Search Bar */}

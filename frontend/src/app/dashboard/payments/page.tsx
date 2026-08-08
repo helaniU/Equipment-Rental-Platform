@@ -8,7 +8,7 @@ interface Payment {
   id: string;
   transactionId?: string;
   amount: number;
-  status: 'PAID' | 'PENDING' | 'REFUNDED' | 'FAILED';
+  status: 'PAID' | 'PENDING' | 'REFUNDED' | 'FAILED' | 'COMPLETED' | string;
   createdAt: string;
   reservation?: {
     id: string;
@@ -97,9 +97,15 @@ export default function PaymentsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-lg font-bold text-gray-800">Checkout & Payment Invoices</h2>
-        <p className="text-xs text-gray-500">Track rental fees, paid security deposits, and settlement status</p>
+      <div className="flex items-center gap-4">
+        <div className="w-1 h-10 rounded-full bg-gradient-to-b from-blue-600 to-indigo-500" />
+        <div>
+          <h2 className="text-xl font-extrabold text-gray-900 tracking-tight">Checkout &amp; Payment Invoices</h2>
+          <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+            Track rental fees, paid security deposits, and settlement status
+          </p>
+        </div>
       </div>
 
       {loading ? (

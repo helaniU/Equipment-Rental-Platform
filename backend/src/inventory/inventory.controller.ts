@@ -16,7 +16,7 @@ export class InventoryController {
 
   @Post(['logs', 'action'])
   @Roles(RoleType.WAREHOUSE_OPERATOR)
-  @ApiOperation({ summary: 'Record inventory event (Warehouse Operator only)' })
+  @ApiOperation({ summary: 'Record inventory event (Warehouse Operator Only)' })
   recordAction(@Request() req: any, @Body() dto: RecordInventoryActionDto) {
     return this.inventoryService.recordAction(req.user, dto);
   }

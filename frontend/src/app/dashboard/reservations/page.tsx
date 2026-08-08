@@ -241,9 +241,15 @@ export default function ReservationsPage() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-lg font-bold text-gray-800">Booking Management</h2>
-          <p className="text-xs text-gray-500">Track and update equipment rental reservations</p>
+        <div className="flex items-center gap-4">
+          <div className="w-1 h-10 rounded-full bg-gradient-to-b from-blue-600 to-indigo-500" />
+          <div>
+            <h2 className="text-xl font-extrabold text-gray-900 tracking-tight">Booking Management</h2>
+            <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+              Track and update equipment rental reservations
+            </p>
+          </div>
         </div>
         {!isStaffOrAdmin && (
           <button
@@ -286,7 +292,7 @@ export default function ReservationsPage() {
 
                   return `${equipmentName} (x${i.quantity})`;
                 }).join(', ') || 'N/A';
-                
+
                 const clientObj = res.customer || res.user;
                 const clientName = clientObj?.fullName || clientObj?.name || 'Customer';
                 const clientEmail = clientObj?.email || '';
@@ -314,7 +320,7 @@ export default function ReservationsPage() {
                         )}
                       </div>
                     </td>
-                    
+
                     <td className="p-4 text-right space-x-2">
                       {isStaffOrAdmin && res.status === 'PENDING' && (
                         <>
@@ -560,11 +566,11 @@ export default function ReservationsPage() {
                   <div>
                     <p className="text-[10px] opacity-70">Cardholder Name</p>
                     <p className="text-xs font-semibold tracking-wide">
-                      {selectedPaymentReservation.customer?.fullName || 
-                       selectedPaymentReservation.customer?.name || 
-                       selectedPaymentReservation.user?.fullName || 
-                       selectedPaymentReservation.user?.name || 
-                       user?.fullName || 'Customer'}
+                      {selectedPaymentReservation.customer?.fullName ||
+                        selectedPaymentReservation.customer?.name ||
+                        selectedPaymentReservation.user?.fullName ||
+                        selectedPaymentReservation.user?.name ||
+                        user?.fullName || 'Customer'}
                     </p>
                   </div>
                   <div className="flex justify-between items-end">
@@ -658,7 +664,7 @@ export default function ReservationsPage() {
                   type="number"
                   min="1"
                   max={
-                    formData.equipmentId 
+                    formData.equipmentId
                       ? (equipmentList.find((eq) => eq.id === formData.equipmentId)?.stockQuantity ?? equipmentList.find((eq) => eq.id === formData.equipmentId)?.quantity ?? 999)
                       : 999
                   }

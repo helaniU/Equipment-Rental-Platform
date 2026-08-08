@@ -80,21 +80,49 @@ export class PaymentsService {
   }
 }
 
+  async updateStatus(paymentId: string, status: PaymentStatus) {
+    const payment = await this.paymentRepo.findOne({
+      where: { id: paymentId },
+      relations: ['reservation'],
+    });
+
+    if (!payment) throw new NotFoundException('Payment record not found');
+
+    payment.status = status;
+    const savedPayment = await this.paymentRepo.save(payment);
+
+    if (status === PaymentStatus.PAID && payment.reservation) {
+      payment.reservation.status = ReservationStatus.APPROVED;
+      await this.reservationRepo.save(payment.reservation);
+    }
+
+    return savedPayment;
+  }
+
   async findAll(user: User) {
     const roleName = typeof user.role === 'object' ? (user.role as any)?.name : user.role;
 
-    if (['ADMIN', 'STAFF'].includes(roleName)) {
-      return this.paymentRepo.find({ order: { createdAt: 'DESC' } });
+    const relations = ['reservation', 'reservation.user', 'reservation.items', 'user'];
+
+    if (['ADMIN', 'STAFF', 'WAREHOUSE_OPERATOR'].includes(roleName)) {
+      return this.paymentRepo.find({
+        relations,
+        order: { createdAt: 'DESC' },
+      });
     }
 
     return this.paymentRepo.find({
       where: { user: { id: user.id } },
+      relations,
       order: { createdAt: 'DESC' },
     });
   }
 
   async findOne(id: string, user: User) {
-    const payment = await this.paymentRepo.findOne({ where: { id } });
+    const payment = await this.paymentRepo.findOne({
+      where: { id },
+      relations: ['reservation', 'reservation.user', 'user'],
+    });
     if (!payment) throw new NotFoundException('Payment not found');
 
     const roleName = typeof user.role === 'object' ? (user.role as any)?.name : user.role;

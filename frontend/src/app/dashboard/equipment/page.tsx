@@ -60,11 +60,30 @@ export default function EquipmentPage() {
   });
 
   const userRole = typeof user?.role === 'object' ? user?.role?.name : user?.role;
-  const isWarehouseOperator = userRole === 'WAREHOUSE_OPERATOR';
+  const canManageEquipment = userRole === 'WAREHOUSE_OPERATOR';
 
   const extractArray = (res: any): any[] => {
     if (Array.isArray(res)) return res;
     if (Array.isArray(res?.data)) return res.data;
+    if (Array.isArray(res?.items)) return res.items;
+    if (Array.isArray(res?.equipment)) return res.equipment;
+    if (Array.isArray(res?.result)) return res.result;
+    return [];
+  };
+
+  const parseImages = (img: any): string[] => {
+    if (!img) return [];
+    if (Array.isArray(img)) return img;
+    if (typeof img === 'string') {
+      try {
+        const parsed = JSON.parse(img);
+        if (Array.isArray(parsed)) return parsed;
+      } catch {
+        // Fallback for simple-array string or single URL string
+        if (img.includes(',')) return img.split(',').map((s) => s.trim());
+        if (img.startsWith('http') || img.startsWith('/')) return [img];
+      }
+    }
     return [];
   };
 
@@ -83,6 +102,7 @@ export default function EquipmentPage() {
       }
     } catch (err) {
       console.error('Failed to load equipment or categories:', err);
+      setEquipment([]);
     } finally {
       setLoading(false);
     }
@@ -215,10 +235,11 @@ export default function EquipmentPage() {
   };
 
   const filteredEquipment = equipment.filter((item) => {
+    const itemCatId = item.category?.id || (typeof item.category === 'string' ? item.category : (item as any).categoryId);
     const matchesSearch =
-      item.name?.toLowerCase().includes(search.toLowerCase()) ||
-      item.description?.toLowerCase().includes(search.toLowerCase());
-    const matchesCat = selectedCategory ? item.category?.id === selectedCategory : true;
+      (item.name || '').toLowerCase().includes(search.toLowerCase()) ||
+      (item.description || '').toLowerCase().includes(search.toLowerCase());
+    const matchesCat = selectedCategory ? itemCatId === selectedCategory : true;
     return matchesSearch && matchesCat;
   });
 
@@ -255,7 +276,7 @@ export default function EquipmentPage() {
           </div>
         </div>
 
-        {isWarehouseOperator && (
+        {canManageEquipment && (
           <div className="flex items-center gap-2">
             <button
               onClick={() => setIsCategoryModalOpen(true)}
@@ -285,52 +306,56 @@ export default function EquipmentPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredEquipment.map((item) => (
-            <div
-              key={item.id}
-              className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm hover:shadow-md transition flex flex-col justify-between"
-            >
-              <div>
-                {item.images && item.images.length > 0 && (
-                  <div className="w-full h-40 mb-3 bg-gray-50 rounded-lg overflow-hidden flex items-center justify-center border border-gray-100">
-                    <img src={item.images[0]} alt={item.name} className="h-full w-full object-contain" />
+          {filteredEquipment.map((item) => {
+            const itemImages = parseImages(item.images);
+            const categoryName = typeof item.category === 'object' ? item.category?.name : (categories.find(c => c.id === (item.category || (item as any).categoryId))?.name);
+
+            return (
+              <div
+                key={item.id}
+                className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm hover:shadow-md transition flex flex-col justify-between"
+              >
+                <div>
+                  {itemImages.length > 0 && (
+                    <div className="w-full h-40 mb-3 bg-gray-50 rounded-lg overflow-hidden flex items-center justify-center border border-gray-100">
+                      <img src={itemImages[0]} alt={item.name} className="h-full w-full object-contain" />
+                    </div>
+                  )}
+                  <div className="flex justify-between items-start mb-2">
+                    <h3 className="font-bold text-gray-900 text-lg">{item.name}</h3>
+                    <span
+                      className={`text-xs px-2.5 py-1 rounded-full font-semibold ${
+                        item.stockQuantity > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                      }`}
+                    >
+                      {item.stockQuantity > 0 ? `${item.stockQuantity} In Stock` : 'Out of Stock'}
+                    </span>
                   </div>
-                )}
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="font-bold text-gray-900 text-lg">{item.name}</h3>
-                  <span
-                    className={`text-xs px-2.5 py-1 rounded-full font-semibold ${
-                      item.stockQuantity > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                    }`}
-                  >
-                    {item.stockQuantity > 0 ? `${item.stockQuantity} In Stock` : 'Out of Stock'}
-                  </span>
+
+                  {categoryName && (
+                    <span className="inline-block bg-blue-50 text-blue-700 text-xs px-2 py-0.5 rounded font-medium mb-2">
+                      {categoryName}
+                    </span>
+                  )}
+
+                  <p className="text-sm text-gray-500 mb-4 line-clamp-2">
+                    {item.description || 'No description available.'}
+                  </p>
                 </div>
 
-                {item.category && (
-                  <span className="inline-block bg-blue-50 text-blue-700 text-xs px-2 py-0.5 rounded font-medium mb-2">
-                    {item.category.name}
-                  </span>
-                )}
-
-                <p className="text-sm text-gray-500 mb-4 line-clamp-2">
-                  {item.description || 'No description available.'}
-                </p>
-              </div>
-
-              <div>
-                <div className="pt-3 border-t border-gray-100 flex items-center justify-between text-sm mb-3">
-                  <div>
-                    <span className="text-gray-400 text-xs block">Daily Rate</span>
-                    <span className="font-bold text-blue-600">LKR {item.rentalPrice}/day</span>
+                <div>
+                  <div className="pt-3 border-t border-gray-100 flex items-center justify-between text-sm mb-3">
+                    <div>
+                      <span className="text-gray-400 text-xs block">Daily Rate</span>
+                      <span className="font-bold text-blue-600">LKR {item.rentalPrice}/day</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 text-xs block">Deposit</span>
+                      <span className="font-semibold text-gray-700">LKR {item.deposit}</span>
+                    </div>
                   </div>
-                  <div>
-                    <span className="text-gray-400 text-xs block">Deposit</span>
-                    <span className="font-semibold text-gray-700">LKR {item.deposit}</span>
-                  </div>
-                </div>
 
-                {isWarehouseOperator && (
+                {canManageEquipment && (
                   <div className="flex gap-2 justify-end border-t pt-2">
                     <button
                       onClick={() => handleOpenEditModal(item)}
@@ -348,7 +373,8 @@ export default function EquipmentPage() {
                 )}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

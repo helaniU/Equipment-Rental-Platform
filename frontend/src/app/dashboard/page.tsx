@@ -85,9 +85,15 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h2 className="text-xl font-bold text-gray-800">Operational Overview & Analytics</h2>
-        <p className="text-xs text-gray-500">Real-time metrics on equipment utilization, revenue, and trends</p>
+      <div className="flex items-center gap-4">
+        <div className="w-1 h-10 rounded-full bg-gradient-to-b from-blue-600 to-indigo-500" />
+        <div>
+          <h2 className="text-xl font-extrabold text-gray-900 tracking-tight">Operational Overview &amp; Analytics</h2>
+          <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+            Real-time metrics on equipment utilization, revenue, and trends
+          </p>
+        </div>
       </div>
 
       {/* 1. TOP KEY METRICS CARDS */}

@@ -137,9 +137,15 @@ export default function InventoryPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-bold text-gray-800">Inventory & Stock Tracking</h2>
-          <p className="text-xs text-gray-500">Manage warehouse stock levels and maintenance statuses</p>
+        <div className="flex items-center gap-4">
+          <div className="w-1 h-10 rounded-full bg-gradient-to-b from-blue-600 to-indigo-500" />
+          <div>
+            <h2 className="text-xl font-extrabold text-gray-900 tracking-tight">Inventory &amp; Stock Tracking</h2>
+            <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+              Manage warehouse stock levels and maintenance statuses
+            </p>
+          </div>
         </div>
 
         <div className="relative max-w-xs w-full">

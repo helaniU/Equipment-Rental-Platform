@@ -5,6 +5,10 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { ForgotPasswordDto, ResetPasswordDto } from './dto/forgot-password.dto';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { RolesGuard } from './guards/roles.guard';
+import { Roles } from './decorators/roles.decorator';
+import { RoleType } from '../database/entities/role.entity';
 
 @ApiTags('Authentication')
 @Controller('auth')
@@ -12,7 +16,10 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Get('users')
-  @ApiOperation({ summary: 'Get all registered users / customers' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(RoleType.ADMIN, RoleType.STAFF)
+  @ApiOperation({ summary: 'Get all registered users / customers (Admin/Staff only)' })
   getAllUsers() {
     return this.authService.getAllUsers();
   }

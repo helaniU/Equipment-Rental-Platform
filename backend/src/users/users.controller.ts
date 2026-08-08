@@ -10,7 +10,7 @@ export class UsersController {
 
   @Patch('me')
   async updateProfile(@Req() req, @Body() updateUserDto: UpdateUserDto) {
-    const userId = req.user.userId; // Or req.user.id depending on your JWT payload
+    const userId = req.user.id || req.user.userId || req.user.sub;
     return this.usersService.update(userId, updateUserDto);
   }
 }

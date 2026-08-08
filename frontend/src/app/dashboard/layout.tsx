@@ -4,15 +4,15 @@ import React from 'react';
 import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { 
-  LayoutDashboard, 
-  Package, 
-  Calendar, 
-  Boxes, 
-  CreditCard, 
+import {
+  LayoutDashboard,
+  Package,
+  Calendar,
+  Boxes,
+  CreditCard,
   Users,
   Settings,
-  LogOut, 
+  LogOut,
   User as UserIcon,
   Bell
 } from 'lucide-react';
@@ -30,10 +30,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   // Extracts role whether backend sends string ('ADMIN') or object ({ name: 'ADMIN' })
-  const roleName = 
-  (typeof user?.role === 'object' ? user?.role?.name : user?.role) || 
-  (user as any)?.roleName || 
-  'CUSTOMER';
+  const roleName =
+    (typeof user?.role === 'object' ? user?.role?.name : user?.role) ||
+    (user as any)?.roleName ||
+    'CUSTOMER';
 
   const navItems = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['ADMIN', 'STAFF', 'CUSTOMER', 'WAREHOUSE_OPERATOR'] },
@@ -47,12 +47,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-screen flex bg-gray-100">
-      {/* Sidebar */}
+      {/* ── Sidebar ── */}
       <aside className="w-64 bg-slate-900 text-white flex flex-col justify-between hidden md:flex">
         <div>
-          <div className="p-6 border-b border-slate-800">
-            <h1 className="text-lg font-bold text-blue-400">Rental Manager</h1>
-            <p className="text-xs text-gray-400 mt-1">Enterprise Gear Platform</p>
+          {/* Brand */}
+          <div className="px-6 py-5 border-b border-slate-800">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
+                <LayoutDashboard className="w-4 h-4 text-white" />
+              </div>
+              <div>
+                <h1 className="text-sm font-extrabold text-white tracking-widest uppercase">Rental Manager</h1>
+                <p className="text-[10px] text-slate-500 font-medium">Enterprise Gear Platform</p>
+              </div>
+            </div>
           </div>
 
           <nav className="p-4 space-y-1">
@@ -65,14 +73,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition ${
+                    className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
                       isActive
-                        ? 'bg-blue-600 text-white'
-                        : 'text-gray-300 hover:bg-slate-800 hover:text-white'
+                        ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                        : 'text-slate-400 hover:bg-slate-800 hover:text-white'
                     }`}
                   >
-                    <Icon className="w-5 h-5" />
+                    <Icon className="w-4 h-4" />
                     {item.name}
+                    {isActive && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-white/60" />}
                   </Link>
                 );
               })}
@@ -82,12 +91,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* User Info & Logout */}
         <div className="p-4 border-t border-slate-800">
           <div className="flex items-center gap-3 px-2 py-2 mb-3">
-            <div className="w-9 h-9 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold">
+            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 text-white flex items-center justify-center font-bold text-sm shadow-md">
               {user?.fullName?.charAt(0) || 'U'}
             </div>
             <div className="overflow-hidden">
-              <p className="text-sm font-medium truncate">{user?.fullName || 'User'}</p>
-              <span className="inline-block px-2 py-0.5 text-[10px] bg-slate-800 text-blue-400 rounded border border-slate-700 font-semibold">
+              <p className="text-sm font-semibold text-white truncate">{user?.fullName || 'User'}</p>
+              <span className="inline-block px-2 py-0.5 text-[10px] bg-blue-600/20 text-blue-400 rounded-md border border-blue-500/20 font-bold uppercase tracking-wide">
                 {roleName}
               </span>
             </div>
@@ -95,7 +104,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
           <button
             onClick={logout}
-            className="w-full flex items-center gap-2 px-4 py-2 rounded-lg text-sm text-red-400 hover:bg-red-500/10 transition"
+            className="w-full flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition"
           >
             <LogOut className="w-4 h-4" />
             Sign Out
@@ -103,28 +112,53 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
       </aside>
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col">
-        {/* Top Header */}
-        <header className="bg-white border-b border-gray-200 px-8 py-4 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-gray-800">
-            {navItems.find((item) => item.href === pathname)?.name || 'Dashboard'}
-          </h2>
+      {/* ── Main Content Area ── */}
+      <div className="flex-1 flex flex-col min-w-0">
 
-          <div className="flex items-center gap-4">
-            <button className="p-2 text-gray-500 hover:bg-gray-100 rounded-full relative">
-              <Bell className="w-5 h-5" />
+        {/* ── Top Header ── */}
+        <header className="bg-white border-b border-gray-200 px-8 py-0 flex items-center justify-between h-16 shadow-xs sticky top-0 z-30">
+          {/* Left: Page Title */}
+          <div className="flex items-center gap-3.5">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-md shadow-blue-500/25">
+              {React.createElement(
+                navItems.find((item) => item.href === pathname)?.icon || LayoutDashboard,
+                { className: 'w-4 h-4 text-white' }
+              )}
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-lg font-extrabold text-gray-900 tracking-tight">
+                  {navItems.find((item) => item.href === pathname)?.name || 'Dashboard'}
+                </h1>
+                <span className="hidden sm:flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-600 border border-blue-200 text-[10px] font-bold uppercase tracking-wider rounded-full">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Live
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Right: Actions */}
+          <div className="flex items-center gap-3">
+            <button className="relative p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition">
+              <Bell className="w-4.5 h-4.5 w-[18px] h-[18px]" />
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-blue-500 border-2 border-white" />
             </button>
-            <div className="flex items-center gap-2 text-sm text-gray-600">
-              <UserIcon className="w-4 h-4" />
-              <span>{user?.email}</span>
+            <div className="flex items-center gap-2.5 bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-xl">
+              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 text-white flex items-center justify-center font-bold text-xs shadow-sm">
+                {user?.fullName?.charAt(0) || 'U'}
+              </div>
+              <div className="hidden sm:block">
+                <p className="text-xs font-semibold text-gray-800 leading-tight">{user?.fullName || 'User'}</p>
+                <p className="text-[10px] text-gray-400 leading-tight">{user?.email}</p>
+              </div>
             </div>
           </div>
         </header>
 
-        {/* Page Children */}
+        {/* ── Page Children ── */}
         <main className="p-8 flex-1 overflow-y-auto">{children}</main>
       </div>
     </div>
   );
-}
+}
