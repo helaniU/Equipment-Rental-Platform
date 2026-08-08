@@ -20,9 +20,15 @@ class EquipmentRentalApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Equipment Rental Platform',
+      debugShowCheckedModeBanner: false, // Removes debug banner from top right
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0F766E)),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF2563EB), // Blue 600 from web app
+          primary: const Color(0xFF2563EB),
+          surface: Colors.white,
+        ),
         useMaterial3: true,
+        fontFamily: 'Roboto',
       ),
       home: Consumer<AppState>(
         builder: (context, state, _) {
