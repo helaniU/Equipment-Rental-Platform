@@ -1,9 +1,26 @@
 import 'dart:convert';
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 
 class ApiClient {
-  final String baseUrl = 'http://10.0.2.2:3000'; // Change if testing on a real device
+  static String get defaultBaseUrl {
+    if (kIsWeb) {
+      return 'http://localhost:5000';
+    }
+    try {
+      if (Platform.isAndroid) {
+        // 10.0.2.2 maps to localhost on the host machine running the NestJS backend
+        return 'http://10.0.2.2:5000';
+      }
+    } catch (_) {}
+    return 'http://localhost:5000';
+  }
+
+  final String baseUrl;
   String? token;
+
+  ApiClient({String? customBaseUrl}) : baseUrl = customBaseUrl ?? defaultBaseUrl;
 
   Map<String, String> get _headers => {
         'Content-Type': 'application/json',
@@ -38,7 +55,20 @@ class ApiClient {
       if (response.body.isEmpty) return null;
       return jsonDecode(response.body);
     } else {
-      throw Exception('API Error (${response.statusCode}): ${response.body}');
+      final body = response.body;
+      try {
+        final decoded = jsonDecode(body);
+        if (decoded is Map && decoded.containsKey('message')) {
+          final msg = decoded['message'];
+          if (msg is List) throw Exception(msg.join(', '));
+          throw Exception(msg.toString());
+        }
+      } catch (e) {
+        if (e is Exception && !e.toString().startsWith('Exception: FormatException')) {
+          rethrow;
+        }
+      }
+      throw Exception('API Error (${response.statusCode}): $body');
     }
   }
 }

@@ -1,10 +1,11 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../services/api_client.dart';
 
 class AppState extends ChangeNotifier {
-  final String _baseUrl = 'http://localhost:3000'; // Android emulator URL
-  
+  String get _baseUrl => ApiClient.defaultBaseUrl;
+
   String? _token;
   String? _role;
   bool _isBusy = false;
@@ -27,11 +28,15 @@ class AppState extends ChangeNotifier {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = jsonDecode(response.body);
-        _token = data['token'] ?? data['access_token'];
-        _role = data['user']?['role'] ?? data['role'] ?? 'customer';
+        _token = data['accessToken'] ?? data['token'] ?? data['access_token'];
+        _role = data['user']?['role']?['name'] ?? data['user']?['role'] ?? data['role'] ?? 'customer';
       } else {
         final errorBody = jsonDecode(response.body);
-        throw Exception(errorBody['message'] ?? 'Invalid login credentials');
+        final msg = errorBody['message'];
+        if (msg is List) {
+          throw Exception(msg.join(', '));
+        }
+        throw Exception(msg?.toString() ?? 'Invalid login credentials');
       }
     } finally {
       _isBusy = false;
@@ -52,13 +57,16 @@ class AppState extends ChangeNotifier {
           'email': email,
           'password': password,
           'phone': phone,
-          'role': 'customer',
         }),
       );
 
       if (response.statusCode != 200 && response.statusCode != 201) {
         final errorBody = jsonDecode(response.body);
-        throw Exception(errorBody['message'] ?? 'Registration failed. Please try again.');
+        final msg = errorBody['message'];
+        if (msg is List) {
+          throw Exception(msg.join(', '));
+        }
+        throw Exception(msg?.toString() ?? 'Registration failed. Please try again.');
       }
     } finally {
       _isBusy = false;
@@ -75,7 +83,11 @@ class AppState extends ChangeNotifier {
 
     if (response.statusCode != 200 && response.statusCode != 201) {
       final errorBody = jsonDecode(response.body);
-      throw Exception(errorBody['message'] ?? 'Failed to send reset instructions.');
+      final msg = errorBody['message'];
+      if (msg is List) {
+        throw Exception(msg.join(', '));
+      }
+      throw Exception(msg?.toString() ?? 'Failed to send reset instructions.');
     }
   }
 
